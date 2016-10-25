@@ -55,7 +55,12 @@ class Game:
         #                     bufsize=1, universal_newlines=True)
 
         # using cmd for testing purposes insted of an IF interpreter + game
-        self.game = Popen(['cmd'], stdin=PIPE, stdout=PIPE, stderr=STDOUT,
+
+
+        terminal = "ls"
+        if os.name != "posix":
+            terminal = "cmd"
+        self.game = Popen([terminal], stdin=PIPE, stdout=PIPE, stderr=STDOUT,
                           bufsize=1, universal_newlines=True)
 
         self.__nbsr = NonBlockingStreamReader(self.game.stdout)
