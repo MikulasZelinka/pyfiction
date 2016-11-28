@@ -1,3 +1,4 @@
-# launch six
+# launch this script from the root of the repository, i.e. from '/pyfiction'
 
-sh ../interpreters/cheapglulxe ../games/Six.gblorb
+rm -f *.glkdata
+interpreters/glulxe/cheapglulxe games/Six/Six.gblorb

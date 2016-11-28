@@ -20,7 +20,7 @@ class NonBlockingStreamReader:
             '''
 
             while True:
-                line = stream.readline()
+                line = stream.readline().decode('utf-8', 'replace')
                 if line:
                     queue.put(line)
                 else:

@@ -8,3 +8,4 @@ class Six(Game):
     author = 'Wade Clarke'
     path = 'games/Six/Six.gblorb'
     interpreter = Glulxe
+    startup_actions = [' \n', ' \n', ' \n', ' \n', '1\n']
