@@ -1,7 +1,7 @@
 # source: http://eyalarubas.com/python-subproc-nonblock.html
 
-from threading import Thread
 from queue import Queue, Empty
+from threading import Thread
 
 
 class NonBlockingStreamReader:
@@ -31,7 +31,7 @@ class NonBlockingStreamReader:
         self._t.daemon = True
         self._t.start()  # start collecting lines from the stream
 
-    def readline(self, timeout=None):
+    def read_line(self, timeout=None):
         try:
             return self._q.get(block=timeout is not None,
                                timeout=timeout)

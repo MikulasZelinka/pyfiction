@@ -1,7 +1,4 @@
-from interpreters.interpreter import Interpreter
-
 class Game(object):
-
     name = ''
     author = ''
     path = ''
@@ -9,6 +6,5 @@ class Game(object):
     # actions that should be entered when the game is started to accept various prompts, warning and settings
     startup_actions = []
 
-
     def __init__(self):
-        print('a')
+        raise NotImplementedError("Game is an abstract class.")
