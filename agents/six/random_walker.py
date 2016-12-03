@@ -3,7 +3,7 @@ from subprocess import call
 
 from agents import agent
 from games.Six.six import Six
-from simulator.simulator import Simulator
+from simulators.simulator import Simulator
 
 
 class RandomWalkerAgent(agent.Agent):
@@ -47,4 +47,5 @@ def main():
         simulator.write(action)
 
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    main()

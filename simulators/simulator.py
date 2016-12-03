@@ -1,6 +1,5 @@
 from subprocess import *
-
-from simulator.nbstreamreader import NonBlockingStreamReader
+from simulators.nbstreamreader import NonBlockingStreamReader
 
 
 class Simulator:
