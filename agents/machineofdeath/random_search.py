@@ -16,85 +16,95 @@ class RandomSearchAgent(agent.Agent):
         self.stepCost = 0
         self.bestReward = -1000000
         self.bestTrace = []
-        self.currentReward = 0
-        self.currentTrace = []
-        self.lastActions = []
+
+        # reward and trace for one episode
+        self.totalReward = 0
+        self.trace = []
+
+        # current text and current chosen action descriptions
+        self.text = ''
+        self.action = ''
+
+
+
         self.endings = []
+        # experience is a set of all traces, where a trace is a set of tuples: [state, action, reward]
+        self.experience = []
         self.reset()
 
     def act(self, text, actions, reward):
-        self.currentReward += reward + self.stepCost
-        actionText = ''
+
+        # store: s, a, r, s', a'
+        self.trace.append([self.text, self.action, reward, text, actions])
+
+        self.text = text
+
+        self.totalReward += reward + self.stepCost
+
         if actions:
             actionID = random.randint(0, len(actions) - 1)
-            actionText = actions[actionID]
-            self.currentTrace.append([text, actionText])
+            self.action = actions[actionID]
             return actionID
 
-        self.currentTrace.append([text, actionText])
 
 
     def reset(self):
         #print('total reward for last episode: ', self.currentReward)
-        if self.currentTrace and self.currentReward > self.bestReward:
-            self.bestReward = self.currentReward
-            self.bestTrace = self.currentTrace
-            print('new best reward : {0:10.3f}'.format(self.bestReward))
-            print('new best actions: ', [x[1] for x in self.bestTrace])
-            print('last state: ', self.currentTrace[-1][0])
-        if self.currentTrace:
-            lastAction = self.currentTrace[-2][1]
-            #print(lastAction)
-            if lastAction not in self.lastActions:
-                #print('new last action: ', lastAction)
-                self.lastActions.append(lastAction)
-            ending = self.currentTrace[-1][0].split('THE END')[0]#.split('<html>')[-2]#.split('.')[-2]
 
-            found = False
+        if self.trace:
 
-            if """You spend your last few moments on Earth lying there, shot through the heart, by the image of Jon Bon Jovi.""" in ending:
-                found = True
-            if """You may be locked away for some time.""" in ending:
-                found = True
-            if """Eventually you're escorted into the back of a police car as Rachel looks on in horror.""" in ending:
-                found = True
-            if """You can't help but smile.""" in ending:
-                found = True
-            if """Fate can wait.""" in ending:
-                found = True
-            if """you hear Bon Jovi say as the world fades around you.""" in ending:
-                found = True
-            if """Hope you have a good life.""" in ending:
-                found = True
-            if """As the screams you hear around you slowly fade and your vision begins to blur, you look at the words which ended your life.""" in ending:
-                found = True
-            if """Sadly, you're so distracted with looking up the number that you don't notice the large truck speeding down the street.""" in ending:
-                found = True
-            if """Stay the hell away from me!&quot; she blurts as she disappears into the crowd emerging from the bar.""" in ending:
-                found = True
-            if """Congratulations!""" in ending:
-                found = True
-            if """All these hiccups lead to one grand disaster.""" in ending:
-                found = True
-            if """After all, it's your life. It's now or never. You ain't gonna live forever. You just want to live while you're alive.""" in ending:
-                found = True
-            if """Rachel waves goodbye as you begin the long drive home. After a few minutes, you turn the radio on to break the silence.""" in ending:
-                found = True
+            if self.totalReward > self.bestReward:
+                self.bestReward = self.totalReward
+                self.bestTrace = self.trace
+                print('new best reward : {0:10.3f}'.format(self.bestReward))
+                print('new best actions: ', [x[1] for x in self.bestTrace])
+                print('last state: ', self.trace[-1][0])
 
-            if not found:
-               # print(ending)
+            # check if all endings are annotated
+            # ending = self.currentTrace[-1][0].split('THE END')[0]#.split('<html>')[-2]#.split('.')[-2]
+            # found = False
+            #
+            # if """You spend your last few moments on Earth lying there, shot through the heart, by the image of Jon Bon Jovi.""" in ending:
+            #     found = True
+            # if """You may be locked away for some time.""" in ending:
+            #     found = True
+            # if """Eventually you're escorted into the back of a police car as Rachel looks on in horror.""" in ending:
+            #     found = True
+            # if """You can't help but smile.""" in ending:
+            #     found = True
+            # if """Fate can wait.""" in ending:
+            #     found = True
+            # if """you hear Bon Jovi say as the world fades around you.""" in ending:
+            #     found = True
+            # if """Hope you have a good life.""" in ending:
+            #     found = True
+            # if """As the screams you hear around you slowly fade and your vision begins to blur, you look at the words which ended your life.""" in ending:
+            #     found = True
+            # if """Sadly, you're so distracted with looking up the number that you don't notice the large truck speeding down the street.""" in ending:
+            #     found = True
+            # if """Stay the hell away from me!&quot; she blurts as she disappears into the crowd emerging from the bar.""" in ending:
+            #     found = True
+            # if """Congratulations!""" in ending:
+            #     found = True
+            # if """All these hiccups lead to one grand disaster.""" in ending:
+            #     found = True
+            # if """After all, it's your life. It's now or never. You ain't gonna live forever. You just want to live while you're alive.""" in ending:
+            #     found = True
+            # if """Rachel waves goodbye as you begin the long drive home. After a few minutes, you turn the radio on to break the silence.""" in ending:
+            #     found = True
+            #
+            # if not found:
+            #    print('ending with no reward found: ', ending)
+            #
+            # if ending not in self.endings:
+            #    print('new ending: ', ending)
+            #    self.endings.append(ending)
+            #    print('endings count: ', len(self.endings))
 
+            self.experience.append(self.trace)
 
-
-
-
-                if ending not in self.endings:
-                   print('new ending: ', ending)
-                   self.endings.append(ending)
-                   print('endings count: ', len(self.endings))
-
-        self.currentReward = 0;
-        self.currentTrace = [];
+        self.totalReward = 0;
+        self.trace = [];
 
 
 
@@ -113,7 +123,7 @@ def main():
     mySimulator, dict_wordId, dict_actionId, maxNumActions = getSimulator()
     numEpisode = 0
     numStep = 0
-    while numEpisode < 100000:
+    while numEpisode < 10000:
         (text, actions, reward) = mySimulator.Read()
         # print(text, actions, reward)
         if len(actions) == 0:
