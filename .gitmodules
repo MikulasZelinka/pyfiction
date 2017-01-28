@@ -1,0 +1,3 @@
+[submodule "simulators/text_games"]
+	path = simulators/text_games
+	url = git@github.com:MikulasZelinka/text-games.git
