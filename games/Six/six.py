@@ -3,6 +3,10 @@ from interpreters.glulxe.glulxe import Glulxe
 
 
 class Six(Game):
+
+    def __init__(self):
+        pass
+
     name = 'Six'
     author = 'Wade Clarke'
     path = 'games/Six/Six.gblorb'

@@ -110,11 +110,11 @@ class RandomSearchAgent(agent.Agent):
 
 
 def getSimulator():
-    with open("simulators/text_games/simulators/machineofdeath_wordId.pickle", "rb") as infile:
+    with open("../../simulators/text_games/simulators/machineofdeath_wordId.pickle", "rb") as infile:
         dict_wordId = pickle.load(infile, encoding='utf-8')
-    with open("simulators/text_games/simulators/machineofdeath_actionId.pickle", "rb") as infile:
+    with open("../../simulators/text_games/simulators/machineofdeath_actionId.pickle", "rb") as infile:
         dict_actionId = pickle.load(infile, encoding='utf-8')
-    return MachineOfDeathSimulator(True), dict_wordId, dict_actionId, 4
+    return MachineOfDeathSimulator(doShuffle=True, doParaphrase=False), dict_wordId, dict_actionId, 4
 
 def main():
 
@@ -126,12 +126,16 @@ def main():
     while numEpisode < 10000:
         (text, actions, reward) = mySimulator.Read()
         # print(text, actions, reward)
+
+        # the game has ended
         if len(actions) == 0:
             agent.act(text, actions, reward)
             mySimulator.Restart()
             numEpisode += 1
             numStep = 0
             agent.reset()
+
+        # choose an action
         else:
 
             # playerInput = input()

@@ -11,4 +11,4 @@ Requirements:
 
 * Linux
 * Python 3.6
-* `text-games <https://github.com/MikulasZelinka/text-games>`_ (only for two games - Saving John and Machine of Death).
+* `text-games <https://github.com/MikulasZelinka/text-games>`_ submodule (only for two games - Saving John and Machine of Death).

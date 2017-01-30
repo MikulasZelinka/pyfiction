@@ -5,7 +5,7 @@ from agents import agent
 from simulators.text_games.simulators.MySimulator import SavingJohnSimulator, StoryNode
 import pickle
 
-# DoctoRRoN
+# DoctoR RoN
 class DoctorRonAgent(agent.Agent):
     def __init__(self):
         random.seed(0)
@@ -15,9 +15,9 @@ class DoctorRonAgent(agent.Agent):
 
 
 def getSimulator():
-    with open("simulators/text_games/simulators/savingjohn_wordId.pickle", "rb") as infile:
+    with open("../../simulators/text_games/simulators/savingjohn_wordId.pickle", "rb") as infile:
         dict_wordId = pickle.load(infile, encoding='utf-8')
-    with open("simulators/text_games/simulators/savingjohn_actionId.pickle", "rb") as infile:
+    with open("../../simulators/text_games/simulators/savingjohn_actionId.pickle", "rb") as infile:
         dict_actionId = pickle.load(infile, encoding='utf-8')
     return SavingJohnSimulator(True), dict_wordId, dict_actionId, 4
 

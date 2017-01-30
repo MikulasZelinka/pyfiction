@@ -44,9 +44,9 @@ class RandomSearchAgent(agent.Agent):
 
 
 def getSimulator():
-    with open("simulators/text_games/simulators/savingjohn_wordId.pickle", "rb") as infile:
+    with open("../../simulators/text_games/simulators/savingjohn_wordId.pickle", "rb") as infile:
         dict_wordId = pickle.load(infile, encoding='utf-8')
-    with open("simulators/text_games/simulators/savingjohn_actionId.pickle", "rb") as infile:
+    with open("../../simulators/text_games/simulators/savingjohn_actionId.pickle", "rb") as infile:
         dict_actionId = pickle.load(infile, encoding='utf-8')
     return SavingJohnSimulator(True), dict_wordId, dict_actionId, 4
 
