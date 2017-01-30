@@ -1,5 +1,5 @@
 from subprocess import *
-from simulators.nbstreamreader import NonBlockingStreamReader
+from pyfiction.simulators.nbstreamreader import NonBlockingStreamReader
 
 
 class Simulator:

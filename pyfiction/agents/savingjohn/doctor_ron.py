@@ -1,8 +1,8 @@
 import random
 import time
-from agents import agent
+from pyfiction.agents import agent
 # StoryNode import is needed for unpickling the game file
-from simulators.text_games.simulators.MySimulator import SavingJohnSimulator, StoryNode
+from pyfiction.simulators.text_games.simulators.MySimulator import SavingJohnSimulator, StoryNode
 import pickle
 
 # DoctoR RoN

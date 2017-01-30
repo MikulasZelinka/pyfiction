@@ -1,5 +1,5 @@
-from games.game import Game
-from interpreters.glulxe.glulxe import Glulxe
+from pyfiction.games.game import Game
+from pyfiction.interpreters.glulxe.glulxe import Glulxe
 
 
 class Six(Game):
