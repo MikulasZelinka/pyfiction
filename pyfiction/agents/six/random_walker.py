@@ -2,8 +2,7 @@ import random
 from subprocess import call
 
 from pyfiction.agents import agent
-from pyfiction.games.Six.six import Six
-from pyfiction.simulators.simulator import Simulator
+from pyfiction.simulators.six_simulator import SixSimulator
 
 
 class RandomWalkerAgent(agent.Agent):
@@ -14,7 +13,7 @@ class RandomWalkerAgent(agent.Agent):
     def act(self, observation):
 
         # handle special cases where a different output than a direction is needed
-        if (observation[-1].endswith('(Y/N)\n')):
+        if observation[-1].endswith('(Y/N)\n'):
             action = 'N\n'
 
         else:
@@ -27,13 +26,12 @@ def main():
     # remove data from older test runs to always start the game from scratch
     call('rm -f *.glkdata', shell=True)
 
-    simulator = Simulator(Six)
+    # simulator = GlulxSimulator(Six)
+    simulator = SixSimulator()
     simulator.start_game()
     simulator.startup_actions()
 
     agent = RandomWalkerAgent()
-
-    observation = []
 
     while True:
         observation = simulator.read()

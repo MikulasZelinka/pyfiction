@@ -1,5 +1,7 @@
+import os
+
+from pyfiction import PYFICTION_PATH
 from pyfiction.games.game import Game
-from pyfiction.interpreters.glulxe.glulxe import Glulxe
 
 
 class Six(Game):
@@ -9,8 +11,7 @@ class Six(Game):
 
     name = 'Six'
     author = 'Wade Clarke'
-    path = 'games/Six/Six.gblorb'
-    interpreter = Glulxe
+    path = os.path.join(PYFICTION_PATH, 'games/Six/Six.gblorb')
 
     # issue extra SPACE commands just to be sure
     startup_actions = [' \n', ' \n', ' \n', ' \n', '1\n', ' \n']
