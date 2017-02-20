@@ -24,11 +24,12 @@ class GlulxSimulator(Simulator):
 
     def startup_actions(self):
         for action in self.game.startup_actions:
-            print(self.read())
+            # print(self.read())
+            self.read()
             self.write(action)
-        print('--------------------------------------')
-        print('all startup actions have been executed')
-        print('--------------------------------------')
+            # print('--------------------------------------')
+            # print('all startup actions have been executed')
+            # print('--------------------------------------')
 
     def write(self, text):
         # print('writing->', repr(text), '<-')

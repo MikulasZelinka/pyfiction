@@ -1,6 +1,5 @@
 import os
 
-from pyfiction import PYFICTION_PATH
 from pyfiction.games.game import Game
 
 
@@ -11,7 +10,7 @@ class Six(Game):
 
     name = 'Six'
     author = 'Wade Clarke'
-    path = os.path.join(PYFICTION_PATH, 'games/Six/Six.gblorb')
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Six.gblorb')
 
     # issue extra SPACE commands just to be sure
     startup_actions = [' \n', ' \n', ' \n', ' \n', '1\n', ' \n']
