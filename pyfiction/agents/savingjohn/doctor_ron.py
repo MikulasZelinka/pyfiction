@@ -1,12 +1,15 @@
 import random
 import time
 from pyfiction.agents import agent
-# StoryNode import is needed for unpickling the game file
-from pyfiction.simulators.text_games.simulators.MySimulator import SavingJohnSimulator, StoryNode
-import pickle
+from pyfiction.simulators.savingjohn_simulator import SavingJohnSimulator
+from pyfiction.simulators.text_games.simulators.MySimulator import StoryNode
 
-# DoctoR RoN
+
 class DoctorRonAgent(agent.Agent):
+    """
+    DRRN agent
+    """
+
     def __init__(self):
         random.seed(0)
 
@@ -14,25 +17,17 @@ class DoctorRonAgent(agent.Agent):
         return random.randint(0, len(actions) - 1)
 
 
-def getSimulator():
-    with open("../../simulators/text_games/simulators/savingjohn_wordId.pickle", "rb") as infile:
-        dict_wordId = pickle.load(infile, encoding='utf-8')
-    with open("../../simulators/text_games/simulators/savingjohn_actionId.pickle", "rb") as infile:
-        dict_actionId = pickle.load(infile, encoding='utf-8')
-    return SavingJohnSimulator(True), dict_wordId, dict_actionId, 4
-
 def main():
-
     agent = DoctorRonAgent()
     startTime = time.time()
-    mySimulator, dict_wordId, dict_actionId, maxNumActions = getSimulator()
+    mySimulator = SavingJohnSimulator()
     numEpisode = 0
     numStep = 0
     while numEpisode < 10:
-        (text, actions, reward) = mySimulator.Read()
+        (text, actions, reward) = mySimulator.read()
         print(text, actions, reward)
         if len(actions) == 0 or numStep > 250:
-            mySimulator.Restart()
+            mySimulator.restart()
             numEpisode += 1
             numStep = 0
         else:
@@ -43,7 +38,7 @@ def main():
 
             print(actions[playerInput])
 
-            mySimulator.Act(playerInput) # playerInput is index of selected actions
+            mySimulator.write(playerInput)  # playerInput is index of selected actions
             numStep += 1
 
     endTime = time.time()

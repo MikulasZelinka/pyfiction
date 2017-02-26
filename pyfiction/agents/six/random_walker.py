@@ -28,8 +28,7 @@ def main():
 
     # simulator = GlulxSimulator(Six)
     simulator = SixSimulator()
-    simulator.start_game()
-    simulator.startup_actions()
+    simulator.restart()
 
     agent = RandomWalkerAgent()
 

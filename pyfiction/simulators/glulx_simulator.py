@@ -13,17 +13,19 @@ class GlulxSimulator(Simulator):
         self.stream = None
         self.stream_reader = None
 
-    def start_game(self):
+    def restart(self):
 
         print('Running interpreter ', self.interpreter.path, ' on game ', self.game.path)
         self.stream = Popen([self.interpreter.path, self.game.path], stdin=PIPE, stdout=PIPE, stderr=STDOUT,
                             bufsize=0, universal_newlines=False)
 
         self.stream_reader = NonBlockingStreamReader(self.stream.stdout)
+
+        self.__startup_actions()
         print('Game started')
 
-    def startup_actions(self):
-        for action in self.game.startup_actions:
+    def __startup_actions(self):
+        for action in self.game.__startup_actions:
             # print(self.read())
             self.read()
             self.write(action)

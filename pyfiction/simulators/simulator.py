@@ -2,10 +2,10 @@ class Simulator:
     def __init__(self):
         raise NotImplementedError("Game is an abstract class.")
 
-    def start_game(self):
+    def restart(self):
         raise NotImplementedError("Game is an abstract class.")
 
-    def startup_actions(self):
+    def __startup_actions(self):
         raise NotImplementedError("Game is an abstract class.")
 
     def write(self, text):
