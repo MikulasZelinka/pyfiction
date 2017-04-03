@@ -16,6 +16,8 @@ class RandomSearchAgent(agent.Agent):
         self.bestTrace = []
         self.currentReward = 0
         self.currentTrace = []
+        self.totalReward = 0
+        self.count = 0
         self.reset()
 
     def act(self, text, actions, reward):
@@ -29,6 +31,8 @@ class RandomSearchAgent(agent.Agent):
 
     def reset(self):
         # print('total reward for last episode: ', self.currentReward)
+        self.totalReward += self.currentReward
+        self.count += 1
         if self.currentTrace and self.currentReward > self.bestReward:
             self.bestReward = self.currentReward
             self.bestTrace = self.currentTrace
@@ -40,18 +44,18 @@ class RandomSearchAgent(agent.Agent):
 
 def main():
     agent = RandomSearchAgent()
-    startTime = time.time()
-    mySimulator = SavingJohnSimulator()
-    numEpisode = 0
-    numStep = 0
-    while numEpisode < 100000:
-        (text, actions, reward) = mySimulator.read()
+    start_time = time.time()
+    my_simulator = SavingJohnSimulator()
+    num_episode = 0
+    num_step = 0
+    while num_episode < 100000:
+        (text, actions, reward) = my_simulator.read()
         # print(text, actions, reward)
-        if len(actions) == 0 or numStep > 250:
+        if len(actions) == 0 or num_step > 250:
             agent.act(text, actions, reward)
-            mySimulator.restart()
-            numEpisode += 1
-            numStep = 0
+            my_simulator.restart()
+            num_episode += 1
+            num_step = 0
             agent.reset()
         else:
 
@@ -61,11 +65,12 @@ def main():
 
             # print(actions[playerInput])
 
-            mySimulator.write(playerInput)  # playerInput is index of selected actions
-            numStep += 1
+            my_simulator.write(playerInput)  # playerInput is index of selected actions
+            num_step += 1
 
-    endTime = time.time()
-    print("Duration: " + str(endTime - startTime))
+    end_time = time.time()
+    print("Duration: ", (end_time - start_time), " seconds")
+    print("Average reward: ", agent.totalReward / agent.count)
 
 
 if __name__ == "__main__":
