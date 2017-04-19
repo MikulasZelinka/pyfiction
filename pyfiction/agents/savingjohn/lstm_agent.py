@@ -74,11 +74,11 @@ class LSTMAgent(agent.Agent):
         best_action = 0
         for i in range(len(actions)):
             q = self.model.predict([text_sequences[0].reshape((1, 32)), actions_sequences[i].reshape((1, 16))])[[0]]
-            logger.debug('q for action %s is %s', i, q)
+            # logger.debug('q for action %s is %s', i, q)
             if q > q_max:
                 q_max = q
                 best_action = i
-        logger.debug('best action is %s', best_action)
+        # logger.debug('best action is %s', best_action)
         return best_action
 
     def create_embeddings(self):
@@ -137,7 +137,7 @@ class LSTMAgent(agent.Agent):
 
         model = Sequential()
 
-        # use Dot instead of Merge (Merge is obsolete soon), but Dot doesn't seem to work
+        # use Dot instead of Merge (Merge is obsolete soon, but Dot doesn't seem to work)
         model.add(Merge([state, action], mode='dot'))
         # model.add(Dot([state, action], axes=[1, 1]))
         # model.add(Dot(input_shape=[state, action], axes=1))
@@ -156,6 +156,7 @@ class LSTMAgent(agent.Agent):
         state_texts = [x[0] for x in self.experience]
         action_texts = [x[1] for x in self.experience]
         state_next_texts = [x[3] for x in self.experience]
+        action_next_texts = [x[5] for x in self.experience]
 
         # vectorize the text samples into a 2D integer tensor
         self.tokenizer.fit_on_texts(action_texts)
@@ -168,6 +169,7 @@ class LSTMAgent(agent.Agent):
         state_sequences = self.tokenizer.texts_to_sequences(state_texts)
         state_next_sequences = self.tokenizer.texts_to_sequences(state_next_texts)
         action_sequences = self.tokenizer.texts_to_sequences(action_texts)
+        action_next_sequences = [self.tokenizer.texts_to_sequences(x) for x in action_next_texts]
 
         self.word_index = self.tokenizer.word_index
         logger.info('Found %s unique tokens.', len(self.word_index))
@@ -175,10 +177,11 @@ class LSTMAgent(agent.Agent):
         states = pad_sequences(state_sequences, maxlen=32)
         actions = pad_sequences(action_sequences, maxlen=16)
         states_next = pad_sequences(state_next_sequences, maxlen=32)
+        actions_next = [pad_sequences(x, maxlen=16) for x in action_next_sequences]
 
         for i in range(len(self.experience)):
             self.experience_sequences.append(
-                (states[i], actions[i], self.experience[i][2], states_next[i], self.experience[i][4]))
+                (states[i], actions[i], self.experience[i][2], states_next[i], self.experience[i][4], actions_next[i]))
 
         # logger.debug('Experience: %s', self.experience)
         # logger.debug('Experience sequences: %s', self.experience_sequences)
@@ -214,12 +217,12 @@ class LSTMAgent(agent.Agent):
 
             (text, actions, reward) = self.simulator.read()
 
-            # override reward from the environment (set small negative instead of zero)
+            # override reward from the environment (set a small negative value instead of zero)
             if reward == 0:
                 reward = -0.01
             if store_experience:
-                self.experience.append(
-                    (cleanup(last_state), cleanup(last_action), reward, cleanup(text), len(actions) < 1))
+                self.experience.append((cleanup(last_state), cleanup(last_action), reward, cleanup(text),
+                                        len(actions) < 1, [cleanup(a) for a in actions]))
                 # logger.debug("%s --- %s --- %s", replace(text), actions, reward)
 
             total_reward += reward
@@ -227,7 +230,7 @@ class LSTMAgent(agent.Agent):
         self.reset()
         return total_reward
 
-    def train(self, batch_size=16, gamma=0.9):
+    def train(self, batch_size=16, gamma=0.95):
         """
         Picks random experiences and trains the model on them
         :param batch_size: number of experiences to be used for training (each is used once)
@@ -244,12 +247,18 @@ class LSTMAgent(agent.Agent):
         targets = np.zeros((batch_size, 1))
 
         for i in range(batch_size):
-            state, action, reward, next_state, done = self.experience_sequences[batches[i]]
+            state, action, reward, state_next, done, actions_next = self.experience_sequences[batches[i]]
             target = reward
             if not done:
-                # predict all actions
-                target = reward + gamma * np.argmax(
-                    self.model.predict([next_state.reshape((1, 32)), action.reshape((1, 16))])[0])
+
+                # get an action with maximum Q value
+                q_max = -np.math.inf
+                for a in actions_next:
+                    q = self.model.predict([state_next.reshape((1, 32)), a.reshape((1, 16))])[[0]]
+                    if q > q_max:
+                        q_max = q
+
+                target += gamma * q_max
 
             states[i] = state
             actions[i] = action
@@ -257,6 +266,8 @@ class LSTMAgent(agent.Agent):
 
             # X is a list of (state, [actions]), Y is a list of targets
             # self.model.fit(X, Y, nb_epoch=1, verbose=1)
+
+            self.model.fit([states, actions], targets, epochs=1, verbose=1)
 
     def test(self, iterations=256):
         """
