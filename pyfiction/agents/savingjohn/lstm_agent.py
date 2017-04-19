@@ -231,7 +231,7 @@ class LSTMAgent(agent.Agent):
         self.reset()
         return total_reward
 
-    def train(self, batch_size=256, gamma=0.95):
+    def train(self, batch_size=64, gamma=0.95):
         """
         Picks random experiences and trains the model on them
         :param batch_size: number of experiences to be used for training (each is used once)
@@ -292,6 +292,8 @@ def main():
         logger.info('Testing started')
         logger.info('Average reward: %s', agent.test(iterations=16))
         logger.info('Testing ended')
+        if i % 10 == 0:
+            agent.model.save('lstm', i, '.hd5')
 
 
 if __name__ == "__main__":
