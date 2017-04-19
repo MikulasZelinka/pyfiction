@@ -47,15 +47,39 @@ class LSTMAgent(agent.Agent):
         np.random.seed(0)
 
         self.simulator = SavingJohnSimulator()
-        self.gamma = 0.9
         self.experience = []
         self.experience_sequences = []
         self.embeddings_index = None
         self.word_index = None
         self.model = None
+        self.tokenizer = Tokenizer(num_words=10000)
 
-    def act(self, text, actions, reward):
-        return random.randint(0, len(actions) - 1)
+    def act(self, text, actions, epsilon=0):
+        """
+        returns an action index either randomly or using the model to pick an action with highest Q-value
+        :param text: state text
+        :param actions: actions to be considered
+        :param epsilon: probability of choosing a random action
+        :return: index of the picked action
+        """
+        if (epsilon > 0 and 1 > epsilon > random.random()) or epsilon == 1:
+            return random.randint(0, len(actions) - 1)
+
+        # create sequences from text data
+        text_sequences = pad_sequences(self.tokenizer.texts_to_sequences([text]), maxlen=32)
+        actions_sequences = pad_sequences(self.tokenizer.texts_to_sequences(actions), maxlen=16)
+
+        # return an action with maximum Q value
+        q_max = -np.math.inf
+        best_action = 0
+        for i in range(len(actions)):
+            q = self.model.predict([text_sequences[0].reshape((1, 32)), actions_sequences[i].reshape((1, 16))])[[0]]
+            logger.debug('q for action %s is %s', i, q)
+            if q > q_max:
+                q_max = q
+                best_action = i
+        logger.debug('best action is %s', best_action)
+        return best_action
 
     def create_embeddings(self):
         GLOVE_DIR = '/home/myke/'
@@ -72,7 +96,10 @@ class LSTMAgent(agent.Agent):
         self.embeddings_index = embeddings_index
 
     def create_model(self):
-
+        """
+        creates the neural network model using precomputed embeddings applied to the training data
+        :return: 
+        """
         self.create_embeddings()
         self.create_sequences()
 
@@ -122,7 +149,7 @@ class LSTMAgent(agent.Agent):
 
     def create_sequences(self):
         """
-        creates sequences of integers (word indices) from lists of strings and also
+        creates sequences of integers (word indices) from lists of strings
         creates experience_sequences (experience with sequences instead of texts)
         """
 
@@ -130,20 +157,19 @@ class LSTMAgent(agent.Agent):
         action_texts = [x[1] for x in self.experience]
         state_next_texts = [x[3] for x in self.experience]
 
-        # finally, vectorize the text samples into a 2D integer tensor
-        tokenizer = Tokenizer(num_words=10000)
-        tokenizer.fit_on_texts(action_texts)
-        logger.debug('Tokenizer word_index after actions: %s words; %s', len(tokenizer.word_index.items()),
-                     tokenizer.word_index)
-        tokenizer.fit_on_texts(state_texts)
-        logger.debug('Tokenizer word_index after states: %s words; %s', len(tokenizer.word_index.items()),
-                     tokenizer.word_index)
+        # vectorize the text samples into a 2D integer tensor
+        self.tokenizer.fit_on_texts(action_texts)
+        logger.info('Tokenizer word_index after actions: %s words; %s', len(self.tokenizer.word_index.items()),
+                    self.tokenizer.word_index)
+        self.tokenizer.fit_on_texts(state_texts)
+        logger.info('Tokenizer word_index after states: %s words; %s', len(self.tokenizer.word_index.items()),
+                    self.tokenizer.word_index)
 
-        state_sequences = tokenizer.texts_to_sequences(state_texts)
-        state_next_sequences = tokenizer.texts_to_sequences(state_next_texts)
-        action_sequences = tokenizer.texts_to_sequences(action_texts)
+        state_sequences = self.tokenizer.texts_to_sequences(state_texts)
+        state_next_sequences = self.tokenizer.texts_to_sequences(state_next_texts)
+        action_sequences = self.tokenizer.texts_to_sequences(action_texts)
 
-        self.word_index = tokenizer.word_index
+        self.word_index = self.tokenizer.word_index
         logger.info('Found %s unique tokens.', len(self.word_index))
 
         states = pad_sequences(state_sequences, maxlen=32)
@@ -165,19 +191,22 @@ class LSTMAgent(agent.Agent):
 
     def sample(self, episodes=100000):
         """
+        generates training data by repeatedly playing the game using a random policy
         :param episodes: number of games to be played
-        :return: experience replay
+        :return: doesn't return anything; the data is stored in self.experience
         """
         for i in range(episodes):
-            self.play_game()
-            self.reset()
+            self.play_game(store_experience=True, epsilon=1)
         logger.info('Sampled %s game episodes.', episodes)
 
-    def play_game(self, store_experience=True):
+    def play_game(self, store_experience=True, epsilon=1):
+
+        total_reward = 0
+
         (text, actions, reward) = self.simulator.read()
         while len(actions) > 0:
 
-            action = self.act(text, actions, reward)
+            action = self.act(text, actions, epsilon)
             self.simulator.write(action)
 
             last_state = text
@@ -191,19 +220,24 @@ class LSTMAgent(agent.Agent):
             if store_experience:
                 self.experience.append(
                     (cleanup(last_state), cleanup(last_action), reward, cleanup(text), len(actions) < 1))
-            # logger.debug("%s --- %s --- %s", replace(text), actions, reward)
-        return reward
+                # logger.debug("%s --- %s --- %s", replace(text), actions, reward)
 
-    def train(self, batch_size=16):
+            total_reward += reward
+
+        self.reset()
+        return total_reward
+
+    def train(self, batch_size=16, gamma=0.9):
         """
         Picks random experiences and trains the model on them
         :param batch_size: number of experiences to be used for training (each is used once)
+        :param gamma: discount factor (higher gamma ~ taking future into account more)
         :return: 
         """
         batches = np.random.choice(len(self.experience_sequences), batch_size)
 
         logger.debug('Batches: %s', batches)
-        logger.debug('First item: %s', self.experience_sequences[batches[0]])
+        # logger.debug('First item: %s', self.experience_sequences[batches[0]])
 
         states = np.zeros((batch_size, 32))
         actions = np.zeros((batch_size, 16))
@@ -214,12 +248,14 @@ class LSTMAgent(agent.Agent):
             target = reward
             if not done:
                 # predict all actions
-                target = reward + self.gamma * np.argmax(self.model.predict([next_state, action])[0])
+                target = reward + gamma * np.argmax(
+                    self.model.predict([next_state.reshape((1, 32)), action.reshape((1, 16))])[0])
 
             states[i] = state
             actions[i] = action
             targets[i] = target
 
+            # X is a list of (state, [actions]), Y is a list of targets
             # self.model.fit(X, Y, nb_epoch=1, verbose=1)
 
     def test(self, iterations=256):
@@ -230,7 +266,7 @@ class LSTMAgent(agent.Agent):
         """
         score = 0
         for i in range(iterations):
-            score += self.play_game(store_experience=False)
+            score += self.play_game(store_experience=False, epsilon=0)
 
         return score / iterations
 
@@ -240,9 +276,10 @@ def main():
     agent.sample(1)
     agent.create_model()
 
-    for i in range(1000):
+    for i in range(5):
+        logger.info('Epoch %s', i)
         agent.train()
-        agent.test()
+        logger.info('Average reward: %s', agent.test(iterations=16))
 
 
 if __name__ == "__main__":
