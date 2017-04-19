@@ -3,6 +3,7 @@ import random
 import os
 
 import numpy as np
+from keras.optimizers import RMSprop
 from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
 
@@ -142,7 +143,7 @@ class LSTMAgent(agent.Agent):
         # model.add(Dot([state, action], axes=[1, 1]))
         # model.add(Dot(input_shape=[state, action], axes=1))
 
-        model.compile(optimizer='rmsprop', loss='mse')
+        model.compile(optimizer=RMSprop(lr=0.0001), loss='mse')
 
         self.model = model
         logger.info('Model created: %s', model.summary())
@@ -230,7 +231,7 @@ class LSTMAgent(agent.Agent):
         self.reset()
         return total_reward
 
-    def train(self, batch_size=16, gamma=0.95):
+    def train(self, batch_size=256, gamma=0.95):
         """
         Picks random experiences and trains the model on them
         :param batch_size: number of experiences to be used for training (each is used once)
@@ -239,7 +240,7 @@ class LSTMAgent(agent.Agent):
         """
         batches = np.random.choice(len(self.experience_sequences), batch_size)
 
-        logger.debug('Batches: %s', batches)
+        # logger.debug('Batches: %s', batches)
         # logger.debug('First item: %s', self.experience_sequences[batches[0]])
 
         states = np.zeros((batch_size, 32))
@@ -249,25 +250,21 @@ class LSTMAgent(agent.Agent):
         for i in range(batch_size):
             state, action, reward, state_next, done, actions_next = self.experience_sequences[batches[i]]
             target = reward
-            if not done:
 
+            if not done:
                 # get an action with maximum Q value
                 q_max = -np.math.inf
                 for a in actions_next:
                     q = self.model.predict([state_next.reshape((1, 32)), a.reshape((1, 16))])[[0]]
                     if q > q_max:
                         q_max = q
-
                 target += gamma * q_max
 
             states[i] = state
             actions[i] = action
             targets[i] = target
 
-            # X is a list of (state, [actions]), Y is a list of targets
-            # self.model.fit(X, Y, nb_epoch=1, verbose=1)
-
-            self.model.fit([states, actions], targets, epochs=1, verbose=1)
+            self.model.fit([states, actions], targets, epochs=1, verbose=0)
 
     def test(self, iterations=256):
         """
@@ -284,13 +281,17 @@ class LSTMAgent(agent.Agent):
 
 def main():
     agent = LSTMAgent()
-    agent.sample(1)
+    agent.sample(1000)
     agent.create_model()
 
-    for i in range(5):
+    for i in range(100):
         logger.info('Epoch %s', i)
+        logger.info('Training started')
         agent.train()
+        logger.info('Training ended')
+        logger.info('Testing started')
         logger.info('Average reward: %s', agent.test(iterations=16))
+        logger.info('Testing ended')
 
 
 if __name__ == "__main__":
