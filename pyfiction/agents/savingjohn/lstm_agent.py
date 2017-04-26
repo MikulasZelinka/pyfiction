@@ -3,6 +3,7 @@ import random
 import os
 
 import numpy as np
+import time
 from keras.optimizers import RMSprop
 from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
@@ -44,6 +45,7 @@ class LSTMAgent(agent.Agent):
     """
 
     def __init__(self):
+        self.experience_sequences_prioritised = []
         random.seed(0)
         np.random.seed(0)
 
@@ -143,7 +145,7 @@ class LSTMAgent(agent.Agent):
         # model.add(Dot([state, action], axes=[1, 1]))
         # model.add(Dot(input_shape=[state, action], axes=1))
 
-        model.compile(optimizer=RMSprop(lr=0.0001), loss='mse')
+        model.compile(optimizer=RMSprop(), loss='mse')
 
         self.model = model
         logger.info('Model created: %s', model.summary())
@@ -181,8 +183,14 @@ class LSTMAgent(agent.Agent):
         actions_next = [pad_sequences(x, maxlen=16) for x in action_next_sequences]
 
         for i in range(len(self.experience)):
-            self.experience_sequences.append(
-                (states[i], actions[i], self.experience[i][2], states_next[i], self.experience[i][4], actions_next[i]))
+
+            exp = (states[i], actions[i], self.experience[i][2], states_next[i], self.experience[i][4], actions_next[i])
+
+            self.experience_sequences.append(exp)
+
+            # save final states separately for prioritised sampling
+            if self.experience[i][4]:
+                self.experience_sequences_prioritised.append(exp)
 
         # logger.debug('Experience: %s', self.experience)
         # logger.debug('Experience sequences: %s', self.experience_sequences)
@@ -205,12 +213,16 @@ class LSTMAgent(agent.Agent):
 
     def play_game(self, store_experience=True, epsilon=1):
 
+        steps = 0
         total_reward = 0
-
+        # logger.debug('playing new game')
         (text, actions, reward) = self.simulator.read()
-        while len(actions) > 0:
-
+        # logger.debug('playing new game2')
+        while len(actions) > 0 and steps < 100:
+            # logger.debug('playing new game3')
+            # logger.debug('s %s', text)
             action = self.act(text, actions, epsilon)
+            # logger.debug('a %s', action)
             self.simulator.write(action)
 
             last_state = text
@@ -227,18 +239,27 @@ class LSTMAgent(agent.Agent):
                 # logger.debug("%s --- %s --- %s", replace(text), actions, reward)
 
             total_reward += reward
+            steps += 1
 
         self.reset()
         return total_reward
 
-    def train(self, batch_size=64, gamma=0.95):
+    def train(self, batch_size=64, gamma=0.95, prioritised=False):
         """
         Picks random experiences and trains the model on them
         :param batch_size: number of experiences to be used for training (each is used once)
         :param gamma: discount factor (higher gamma ~ taking future into account more)
+        :param prioritised: only sample prioritised experience (final states with higher reward values)
         :return: 
         """
-        batches = np.random.choice(len(self.experience_sequences), batch_size)
+
+        source = self.experience_sequences
+
+        if prioritised:
+            source = self.experience_sequences_prioritised
+            logger.debug('sampling prioritised only, %s from %s', batch_size, len(source))
+
+        batches = np.random.choice(len(source), batch_size)
 
         # logger.debug('Batches: %s', batches)
         # logger.debug('First item: %s', self.experience_sequences[batches[0]])
@@ -248,7 +269,7 @@ class LSTMAgent(agent.Agent):
         targets = np.zeros((batch_size, 1))
 
         for i in range(batch_size):
-            state, action, reward, state_next, done, actions_next = self.experience_sequences[batches[i]]
+            state, action, reward, state_next, done, actions_next = source[batches[i]]
             target = reward
 
             if not done:
@@ -281,19 +302,28 @@ class LSTMAgent(agent.Agent):
 
 def main():
     agent = LSTMAgent()
-    agent.sample(1000)
+    agent.sample(10000)
     agent.create_model()
 
-    for i in range(100):
+    for i in range(256):
         logger.info('Epoch %s', i)
         logger.info('Training started')
-        agent.train()
+        agent.train(batch_size=32, prioritised=i < 32)
         logger.info('Training ended')
         logger.info('Testing started')
-        logger.info('Average reward: %s', agent.test(iterations=16))
-        logger.info('Testing ended')
-        if i % 10 == 0:
-            agent.model.save('lstm', i, '.hd5')
+        reward = agent.test(iterations=1)
+        logger.info('Average reward: %s', reward)
+
+        # if reward > 19.92:
+        #     agent.model.save('lstm-trained' + str(i) + '.hd5')
+        #
+        # if reward >= 19.94:
+        #     r = agent.test(iterations=1)
+        #     logger.info('best path found, reward: %s', r)
+        #     time.sleep(1)
+        #
+        # if i % 10 == 0:
+        #     agent.model.save('lstm' + str(i) + '.hd5')
 
 
 if __name__ == "__main__":
