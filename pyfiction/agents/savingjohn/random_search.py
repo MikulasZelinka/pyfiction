@@ -11,7 +11,7 @@ class RandomSearchAgent(agent.Agent):
     def __init__(self):
         random.seed(0)
         # we want to find the shortest best solution if possible
-        self.stepCost = -0.001
+        self.stepCost = -0.01
         self.bestReward = -1000000
         self.bestTrace = []
         self.currentReward = 0

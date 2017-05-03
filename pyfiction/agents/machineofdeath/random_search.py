@@ -5,11 +5,10 @@ from pyfiction.agents import agent
 from pyfiction.simulators.text_games.simulators.MySimulator import MachineOfDeathSimulator, StoryNode
 import pickle
 
+
 # This agent randomly searches the action space and remembers the best trace
 # Best trace is a list of all game states and actions resulting in the largest cumulative reward
 class RandomSearchAgent(agent.Agent):
-
-
     def __init__(self):
         random.seed(0)
         # we want to find the shortest best solution if possible
@@ -24,8 +23,6 @@ class RandomSearchAgent(agent.Agent):
         # current text and current chosen action descriptions
         self.text = ''
         self.action = ''
-
-
 
         self.endings = []
         # experience is a set of all traces, where a trace is a set of tuples: [state, action, reward]
@@ -46,10 +43,8 @@ class RandomSearchAgent(agent.Agent):
             self.action = actions[actionID]
             return actionID
 
-
-
     def reset(self):
-        #print('total reward for last episode: ', self.currentReward)
+        # print('total reward for last episode: ', self.currentReward)
 
         if self.trace:
 
@@ -103,10 +98,8 @@ class RandomSearchAgent(agent.Agent):
 
             self.experience.append(self.trace)
 
-        self.totalReward = 0;
-        self.trace = [];
-
-
+        self.totalReward = 0
+        self.trace = []
 
 
 def getSimulator():
@@ -116,23 +109,26 @@ def getSimulator():
         dict_actionId = pickle.load(infile, encoding='utf-8')
     return MachineOfDeathSimulator(doShuffle=True, doParaphrase=False), dict_wordId, dict_actionId, 4
 
-def main():
 
+def main():
     agent = RandomSearchAgent()
     startTime = time.time()
     mySimulator, dict_wordId, dict_actionId, maxNumActions = getSimulator()
     numEpisode = 0
-    numStep = 0
-    while numEpisode < 10000:
+    totalReward = 0
+    steps = 10000
+    while numEpisode < steps:
         (text, actions, reward) = mySimulator.Read()
         # print(text, actions, reward)
 
+        totalReward += reward
+
         # the game has ended
         if len(actions) == 0:
+
             agent.act(text, actions, reward)
             mySimulator.Restart()
             numEpisode += 1
-            numStep = 0
             agent.reset()
 
         # choose an action
@@ -144,10 +140,10 @@ def main():
 
             # print(actions[playerInput])
 
-            mySimulator.Act(playerInput) # playerInput is index of selected actions
-            numStep += 1
+            mySimulator.Act(playerInput)  # playerInput is index of selected actions
 
     endTime = time.time()
+    print("Average reward: ", totalReward / steps)
     print("Duration: " + str(endTime - startTime))
 
 

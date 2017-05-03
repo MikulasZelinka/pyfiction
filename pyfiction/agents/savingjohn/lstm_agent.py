@@ -19,15 +19,16 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-def cleanup(text, chars=''):
+def preprocess(text, chars=''):
     """
     function that removes whitespaces, converts to lowercase, etc.
-    :param text: text input to be
+    :param text: text input 
     :param chars: chars to be removed
     :return: cleaned up text
     """
+
     # replace newlines with spaces, remove slashes and double hyphens
-    text = text.replace('\\n', ' ').replace('/', '').replace('--', '')
+    text = text.replace('\\n', ' ').replace('/', '').replace('--', '').replace('’', '\'')
     # remove multiple whitespaces
     text = ' '.join(text.split())
 
@@ -35,7 +36,31 @@ def cleanup(text, chars=''):
     for c in chars:
         if c in text:
             text = text.replace(c, '')
-    return text.lower()
+
+    # convert to lowercase
+    text = text.lower()
+
+    # expand 'm, 's, 're etc.
+    text = text. \
+        replace('i\'m ', 'i am '). \
+        replace('you\'re ', 'you are '). \
+        replace('he\'s ', 'he is '). \
+        replace('it\'s ', 'it is '). \
+        replace('that\'s ', 'that is '). \
+        replace('let\'s ', 'let us '). \
+        replace('who\'s ', 'who is '). \
+        replace('what\'s ', 'what is '). \
+        replace('there\'s ', 'there is '). \
+        replace('we\'re ', 'we are '). \
+        replace('they\'re ', 'they are '). \
+        replace('can\'t', 'cannot'). \
+        replace('won\'t', 'will not'). \
+        replace('n\'t', ' not'). \
+        replace('\'d ', ' would '). \
+        replace('\'ll ', ' will '). \
+        replace('\'ve ', ' have ')
+
+    return text
 
 
 class LSTMAgent(agent.Agent):
@@ -56,6 +81,15 @@ class LSTMAgent(agent.Agent):
         self.word_index = None
         self.model = None
         self.tokenizer = Tokenizer(num_words=10000)
+
+        # parameters
+        self.step_cost = -0.01
+        self.max_steps = 100  # maximum number of actions in one episode before it is terminated
+        self.embeddings_dimensions = 50
+        self.embeddings_path = 'glove.6B.' + str(self.embeddings_dimensions) + 'd.txt'
+        self.max_words = 8192  # maximum number of unique words to use
+        self.state_length = 32  # length of state description in tokens
+        self.action_length = 16  # length of action description in tokens
 
     def act(self, text, actions, epsilon=0):
         """
@@ -85,17 +119,16 @@ class LSTMAgent(agent.Agent):
         return best_action
 
     def create_embeddings(self):
-        GLOVE_DIR = '/home/myke/'
         embeddings_index = {}
-        f = open(os.path.join(GLOVE_DIR, 'glove.6B.50d.txt'))
+        f = open(self.embeddings_path)
         for line in f:
             values = line.split()
             word = values[0]
-            coefs = np.asarray(values[1:], dtype='float32')
-            embeddings_index[word] = coefs
+            coefficients = np.asarray(values[1:], dtype='float32')
+            embeddings_index[word] = coefficients
         f.close()
 
-        logger.info('Found %s word vectors.' % len(embeddings_index))
+        logger.info('GloVe embeddings are using %s word vectors.' % len(embeddings_index))
         self.embeddings_index = embeddings_index
 
     def create_model(self):
@@ -103,37 +136,41 @@ class LSTMAgent(agent.Agent):
         creates the neural network model using precomputed embeddings applied to the training data
         :return: 
         """
+        logger.info('Creating word embeddings.')
         self.create_embeddings()
+        logger.info('Transforming words from experience into sequences of embedding indices.')
         self.create_sequences()
 
-        num_words = min(10000, len(self.word_index))
-        logger.info('Using %s words', num_words)
+        num_words = min(len(self.word_index), self.max_words)
+        logger.info('Creating a model based on %s unique tokens in the word index: %s', num_words, self.word_index)
 
         # indices in word_index start with a 1 so we will have an empty 0 index
-        embedding_matrix = np.zeros((num_words + 1, 50))
-        logger.debug('word_index %s', self.word_index)
+        embedding_matrix = np.zeros((num_words + 1, self.embeddings_dimensions))
+
         for word, i in self.word_index.items():
-            if i >= 10000:
+            if i >= self.max_words:
                 continue
             embedding_vector = self.embeddings_index.get(word)
             if embedding_vector is not None:
                 # words not found in embedding index will be all-zeros.
                 embedding_matrix[i] = embedding_vector
+            else:
+                logger.warning('Word not found in embeddings: %s', word)
 
         state = Sequential()
         state.add(Embedding(num_words + 1,
-                            50,
+                            self.embeddings_dimensions,
                             weights=[embedding_matrix],
-                            input_length=32,
+                            input_length=self.state_length,
                             trainable=False))
         state.add(LSTM(64, input_shape=(128, 64)))
         state.add(Dense(8, activation='tanh'))
 
         action = Sequential()
         action.add(Embedding(num_words + 1,
-                             50,
+                             self.embeddings_dimensions,
                              weights=[embedding_matrix],
-                             input_length=16,
+                             input_length=self.action_length,
                              trainable=False))
         action.add(LSTM(16, input_shape=(32, 64)))
         action.add(Dense(8, activation='tanh'))
@@ -148,7 +185,10 @@ class LSTMAgent(agent.Agent):
         model.compile(optimizer=RMSprop(), loss='mse')
 
         self.model = model
-        logger.info('Model created: %s', model.summary())
+
+        logger.info('State model: %s', state.summary())
+        logger.info('Action model: %s', action.summary())
+        logger.info('Complete model: %s', model.summary())
 
     def create_sequences(self):
         """
@@ -161,26 +201,28 @@ class LSTMAgent(agent.Agent):
         state_next_texts = [x[3] for x in self.experience]
         action_next_texts = [x[5] for x in self.experience]
 
+        logger.info('Fitting tokenizer on action texts and state texts.')
+
         # vectorize the text samples into a 2D integer tensor
         self.tokenizer.fit_on_texts(action_texts)
-        logger.info('Tokenizer word_index after actions: %s words; %s', len(self.tokenizer.word_index.items()),
+        logger.info('Tokenizer after going through actions: %s words - %s', len(self.tokenizer.word_index.items()),
                     self.tokenizer.word_index)
         self.tokenizer.fit_on_texts(state_texts)
-        logger.info('Tokenizer word_index after states: %s words; %s', len(self.tokenizer.word_index.items()),
+        logger.info('Tokenizer after adding states on top of actions: %s words - %s',
+                    len(self.tokenizer.word_index.items()),
                     self.tokenizer.word_index)
+
+        self.word_index = self.tokenizer.word_index
 
         state_sequences = self.tokenizer.texts_to_sequences(state_texts)
         state_next_sequences = self.tokenizer.texts_to_sequences(state_next_texts)
         action_sequences = self.tokenizer.texts_to_sequences(action_texts)
         action_next_sequences = [self.tokenizer.texts_to_sequences(x) for x in action_next_texts]
 
-        self.word_index = self.tokenizer.word_index
-        logger.info('Found %s unique tokens.', len(self.word_index))
-
-        states = pad_sequences(state_sequences, maxlen=32)
-        actions = pad_sequences(action_sequences, maxlen=16)
-        states_next = pad_sequences(state_next_sequences, maxlen=32)
-        actions_next = [pad_sequences(x, maxlen=16) for x in action_next_sequences]
+        states = pad_sequences(state_sequences, maxlen=self.state_length)
+        actions = pad_sequences(action_sequences, maxlen=self.action_length)
+        states_next = pad_sequences(state_next_sequences, maxlen=self.state_length)
+        actions_next = [pad_sequences(x, maxlen=self.action_length) for x in action_next_sequences]
 
         for i in range(len(self.experience)):
 
@@ -195,47 +237,48 @@ class LSTMAgent(agent.Agent):
         # logger.debug('Experience: %s', self.experience)
         # logger.debug('Experience sequences: %s', self.experience_sequences)
 
-        logger.info('Shape of state tensor: %s', states.shape)
-        logger.info('Shape of action tensor: %s', actions.shape)
+        logger.info('All experiences transformed to padded sequences of token indices.')
+
+        logger.info('Shape of the state tensor: %s', states.shape)
+        logger.info('Shape of the action tensor: %s', actions.shape)
 
     def reset(self):
         self.simulator.restart()
 
-    def sample(self, episodes=100000):
+    def sample(self, episodes=65536):
         """
         generates training data by repeatedly playing the game using a random policy
         :param episodes: number of games to be played
         :return: doesn't return anything; the data is stored in self.experience
         """
+        logger.info('Sampling %s game episodes using random actions.', episodes)
         for i in range(episodes):
             self.play_game(store_experience=True, epsilon=1)
-        logger.info('Sampled %s game episodes.', episodes)
+        logger.info('Successfully sampled %s game episodes, got %s experiences.', episodes, len(self.experience))
 
     def play_game(self, store_experience=True, epsilon=1):
 
         steps = 0
         total_reward = 0
         # logger.debug('playing new game')
-        (text, actions, reward) = self.simulator.read()
-        # logger.debug('playing new game2')
-        while len(actions) > 0 and steps < 100:
-            # logger.debug('playing new game3')
+        (state, actions, reward) = self.simulator.read()
+        while len(actions) > 0 and steps < self.max_steps:
             # logger.debug('s %s', text)
-            action = self.act(text, actions, epsilon)
+            action = self.act(state, actions, epsilon)
             # logger.debug('a %s', action)
             self.simulator.write(action)
 
-            last_state = text
+            last_state = state
             last_action = actions[action]
 
-            (text, actions, reward) = self.simulator.read()
+            (state, actions, reward) = self.simulator.read()
 
-            # override reward from the environment (set a small negative value instead of zero)
-            if reward == 0:
-                reward = -0.01
+            # override reward from the environment in a non-terminal state (set a small negative value instead of zero)
+            if reward == 0 and len(actions) > 0:
+                reward = self.step_cost
             if store_experience:
-                self.experience.append((cleanup(last_state), cleanup(last_action), reward, cleanup(text),
-                                        len(actions) < 1, [cleanup(a) for a in actions]))
+                self.experience.append((preprocess(last_state), preprocess(last_action), reward, preprocess(state),
+                                        len(actions) < 1, [preprocess(a) for a in actions]))
                 # logger.debug("%s --- %s --- %s", replace(text), actions, reward)
 
             total_reward += reward
@@ -244,7 +287,7 @@ class LSTMAgent(agent.Agent):
         self.reset()
         return total_reward
 
-    def train(self, batch_size=64, gamma=0.95, prioritised=False):
+    def train(self, batch_size=64, gamma=0.99, prioritised=False):
         """
         Picks random experiences and trains the model on them
         :param batch_size: number of experiences to be used for training (each is used once)
@@ -287,7 +330,7 @@ class LSTMAgent(agent.Agent):
 
             self.model.fit([states, actions], targets, epochs=1, verbose=0)
 
-    def test(self, iterations=256):
+    def test(self, iterations=16):
         """
         Uses the model to play the game, always picking the action with the highest Q-value.
         :param iterations: Number of games to be played.
@@ -302,15 +345,15 @@ class LSTMAgent(agent.Agent):
 
 def main():
     agent = LSTMAgent()
-    agent.sample(10000)
+    agent.sample(episodes=8192)
     agent.create_model()
 
     for i in range(256):
         logger.info('Epoch %s', i)
-        logger.info('Training started')
+        # logger.info('Training started')
         agent.train(batch_size=32, prioritised=i < 32)
-        logger.info('Training ended')
-        logger.info('Testing started')
+        # logger.info('Training ended')
+        # logger.info('Testing started')
         reward = agent.test(iterations=1)
         logger.info('Average reward: %s', reward)
 
