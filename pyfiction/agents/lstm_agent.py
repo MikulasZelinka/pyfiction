@@ -1,9 +1,9 @@
 import logging
-import random
 import os
+import random
 
 import numpy as np
-import time
+
 from keras.optimizers import RMSprop
 from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-def preprocess(text, chars=''):
+def preprocess(text, chars='”“'):
     """
     function that removes whitespaces, converts to lowercase, etc.
     :param text: text input 
@@ -27,8 +27,9 @@ def preprocess(text, chars=''):
     :return: cleaned up text
     """
 
-    # replace newlines with spaces, remove slashes and double hyphens
-    text = text.replace('\\n', ' ').replace('/', '').replace('--', '').replace('’', '\'')
+    # replace newlines with spaces, remove slashes, quotes and double hyphens
+    text = text.replace('\\n', ' ').replace('/', '').replace('--', '').replace('‘', '\'').replace('’', '\'').replace(
+        '“', '').replace('”', '')
     # remove multiple whitespaces
     text = ' '.join(text.split())
 
@@ -69,12 +70,12 @@ class LSTMAgent(agent.Agent):
     Uses precomputed word embeddings (GloVe)
     """
 
-    def __init__(self):
+    def __init__(self, simulator):
         self.experience_sequences_prioritised = []
         random.seed(0)
         np.random.seed(0)
 
-        self.simulator = SavingJohnSimulator()
+        self.simulator = simulator()
         self.experience = []
         self.experience_sequences = []
         self.embeddings_index = None
@@ -120,7 +121,7 @@ class LSTMAgent(agent.Agent):
 
     def create_embeddings(self):
         embeddings_index = {}
-        f = open(self.embeddings_path)
+        f = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), self.embeddings_path))
         for line in f:
             values = line.split()
             word = values[0]
@@ -338,13 +339,13 @@ class LSTMAgent(agent.Agent):
         """
         score = 0
         for i in range(iterations):
-            score += self.play_game(store_experience=False, epsilon=0)
+            score += self.play_game(store_experience=True, epsilon=0)
 
         return score / iterations
 
 
 def main():
-    agent = LSTMAgent()
+    agent = LSTMAgent(SavingJohnSimulator)
     agent.sample(episodes=8192)
     agent.create_model()
 
