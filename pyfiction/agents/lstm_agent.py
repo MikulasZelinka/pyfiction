@@ -149,6 +149,7 @@ class LSTMAgent(agent.Agent):
         embedding_matrix = np.zeros((num_words + 1, self.embeddings_dimensions))
 
         for word, i in self.word_index.items():
+            # i = i - 1
             if i >= self.max_words:
                 continue
             embedding_vector = self.embeddings_index.get(word)
@@ -163,8 +164,9 @@ class LSTMAgent(agent.Agent):
                             self.embeddings_dimensions,
                             weights=[embedding_matrix],
                             input_length=self.state_length,
+                            mask_zero=True,
                             trainable=False))
-        state.add(LSTM(64, input_shape=(128, 64)))
+        state.add(LSTM(32))
         state.add(Dense(8, activation='tanh'))
 
         action = Sequential()
@@ -172,8 +174,9 @@ class LSTMAgent(agent.Agent):
                              self.embeddings_dimensions,
                              weights=[embedding_matrix],
                              input_length=self.action_length,
+                             mask_zero=True,
                              trainable=False))
-        action.add(LSTM(16, input_shape=(32, 64)))
+        action.add(LSTM(16))
         action.add(Dense(8, activation='tanh'))
 
         model = Sequential()
@@ -231,12 +234,16 @@ class LSTMAgent(agent.Agent):
 
             self.experience_sequences.append(exp)
 
-            # save final states separately for prioritised sampling
+            # save a set of unique final states separately for prioritised sampling
             if self.experience[i][4]:
-                self.experience_sequences_prioritised.append(exp)
+                exp_list = (exp[0].tolist(), exp[1].tolist(), exp[2], exp[3].tolist(), exp[4], exp[5].tolist())
+                if exp_list not in self.experience_sequences_prioritised:
+                    self.experience_sequences_prioritised.append(exp_list)
 
         # logger.debug('Experience: %s', self.experience)
         # logger.debug('Experience sequences: %s', self.experience_sequences)
+        logger.debug('Unique final experiences - total %s, %s', len(self.experience_sequences_prioritised),
+                     self.experience_sequences_prioritised)
 
         logger.info('All experiences transformed to padded sequences of token indices.')
 
@@ -330,6 +337,10 @@ class LSTMAgent(agent.Agent):
             targets[i] = target
 
             self.model.fit([states, actions], targets, epochs=1, verbose=0)
+
+            # logger.debug('trained states: %s', states)
+            # logger.debug('trained actions: %s', actions)
+            # logger.debug('trained targets: %s', targets)
 
     def test(self, iterations=16):
         """
