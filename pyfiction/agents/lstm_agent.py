@@ -145,11 +145,10 @@ class LSTMAgent(agent.Agent):
         num_words = min(len(self.word_index), self.max_words)
         logger.info('Creating a model based on %s unique tokens in the word index: %s', num_words, self.word_index)
 
-        # indices in word_index start with a 1 so we will have an empty 0 index
+        # indices in word_index start with a 1, 0 is reserved for masking padded value
         embedding_matrix = np.zeros((num_words + 1, self.embeddings_dimensions))
 
         for word, i in self.word_index.items():
-            # i = i - 1
             if i >= self.max_words:
                 continue
             embedding_vector = self.embeddings_index.get(word)
