@@ -13,9 +13,6 @@ agent.create_model()
 
 for i in range(256):
     logger.info('Epoch %s', i)
-    # logger.info('Training started')
-    agent.train(batch_size=32, prioritised=i < 32)
-    # logger.info('Training ended')
-    # logger.info('Testing started')
+    agent.train(batch_size=32, prioritised=i < 4)
     reward = agent.test(iterations=1)
     logger.info('Average reward: %s', reward)

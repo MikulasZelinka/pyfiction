@@ -89,7 +89,7 @@ class LSTMAgent(agent.Agent):
         self.embeddings_dimensions = 50
         self.embeddings_path = 'glove.6B.' + str(self.embeddings_dimensions) + 'd.txt'
         self.max_words = 8192  # maximum number of unique words to use
-        self.state_length = 32  # length of state description in tokens
+        self.state_length = 64  # length of state description in tokens
         self.action_length = 16  # length of action description in tokens
 
     def act(self, text, actions, epsilon=0):
@@ -104,14 +104,14 @@ class LSTMAgent(agent.Agent):
             return random.randint(0, len(actions) - 1)
 
         # create sequences from text data
-        text_sequences = pad_sequences(self.tokenizer.texts_to_sequences([text]), maxlen=32)
-        actions_sequences = pad_sequences(self.tokenizer.texts_to_sequences(actions), maxlen=16)
+        text_sequences = pad_sequences(self.tokenizer.texts_to_sequences([text]), maxlen=self.state_length)
+        actions_sequences = pad_sequences(self.tokenizer.texts_to_sequences(actions), maxlen=self.action_length)
 
         # return an action with maximum Q value
         q_max = -np.math.inf
         best_action = 0
         for i in range(len(actions)):
-            q = self.model.predict([text_sequences[0].reshape((1, 32)), actions_sequences[i].reshape((1, 16))])[[0]]
+            q = self.q(text_sequences[0], actions_sequences[i])
             # logger.debug('q for action %s is %s', i, q)
             if q > q_max:
                 q_max = q
@@ -165,7 +165,7 @@ class LSTMAgent(agent.Agent):
                             input_length=self.state_length,
                             mask_zero=True,
                             trainable=False))
-        state.add(LSTM(32))
+        state.add(LSTM(self.state_length))
         state.add(Dense(8, activation='tanh'))
 
         action = Sequential()
@@ -175,7 +175,7 @@ class LSTMAgent(agent.Agent):
                              input_length=self.action_length,
                              mask_zero=True,
                              trainable=False))
-        action.add(LSTM(16))
+        action.add(LSTM(self.action_length))
         action.add(Dense(8, activation='tanh'))
 
         model = Sequential()
@@ -221,6 +221,30 @@ class LSTMAgent(agent.Agent):
         state_next_sequences = self.tokenizer.texts_to_sequences(state_next_texts)
         action_sequences = self.tokenizer.texts_to_sequences(action_texts)
         action_next_sequences = [self.tokenizer.texts_to_sequences(x) for x in action_next_texts]
+
+        # check if maximum length parameters make sense for the actual values from the game:
+        max_state_length = 0
+        for seq in state_sequences:
+            if len(seq) > max_state_length:
+                max_state_length = len(seq)
+
+        max_action_length = 0
+        for seq in action_sequences:
+            if len(seq) > max_action_length:
+                max_action_length = len(seq)
+
+        logger.info('Max state description length: %s, trimming to max %s', max_state_length, self.state_length)
+        logger.info('Max action description length: %s, trimming to max %s', max_action_length, self.action_length)
+
+        if max_state_length < self.state_length:
+            self.state_length = max_state_length
+            logger.warning('Max found state description length was %s, lowering the max to this value.',
+                           self.state_length)
+
+        if max_action_length < self.action_length:
+            self.action_length = max_action_length
+            logger.warning('Max found action description length was %s, lowering the max to this value.',
+                           self.action_length)
 
         states = pad_sequences(state_sequences, maxlen=self.state_length)
         actions = pad_sequences(action_sequences, maxlen=self.action_length)
@@ -314,8 +338,8 @@ class LSTMAgent(agent.Agent):
         # logger.debug('Batches: %s', batches)
         # logger.debug('First item: %s', self.experience_sequences[batches[0]])
 
-        states = np.zeros((batch_size, 32))
-        actions = np.zeros((batch_size, 16))
+        states = np.zeros((batch_size, self.state_length))
+        actions = np.zeros((batch_size, self.action_length))
         targets = np.zeros((batch_size, 1))
 
         for i in range(batch_size):
@@ -325,8 +349,8 @@ class LSTMAgent(agent.Agent):
             if not done:
                 # get an action with maximum Q value
                 q_max = -np.math.inf
-                for a in actions_next:
-                    q = self.model.predict([state_next.reshape((1, 32)), a.reshape((1, 16))])[[0]]
+                for action_next in actions_next:
+                    q = self.q(state_next, action_next)
                     if q > q_max:
                         q_max = q
                 target += gamma * q_max
@@ -353,6 +377,15 @@ class LSTMAgent(agent.Agent):
 
         return score / iterations
 
+    def q(self, state, action):
+        """
+        returns the Q-value of a single (state,action) pair
+        :param state: 
+        :param action: 
+        :return: Q-value estimated by the NN model
+        """
+        return self.model.predict([state.reshape((1, self.state_length)), action.reshape((1, self.action_length))])[[0]]
+
 
 def main():
     agent = LSTMAgent(SavingJohnSimulator)
@@ -361,24 +394,13 @@ def main():
 
     for i in range(256):
         logger.info('Epoch %s', i)
-        # logger.info('Training started')
         agent.train(batch_size=32, prioritised=i < 32)
-        # logger.info('Training ended')
-        # logger.info('Testing started')
         reward = agent.test(iterations=1)
         logger.info('Average reward: %s', reward)
 
-        # if reward > 19.92:
-        #     agent.model.save('lstm-trained' + str(i) + '.hd5')
-        #
-        # if reward >= 19.94:
-        #     r = agent.test(iterations=1)
-        #     logger.info('best path found, reward: %s', r)
-        #     time.sleep(1)
-        #
-        # if i % 10 == 0:
-        #     agent.model.save('lstm' + str(i) + '.hd5')
+        # agent.model.save('lstm-trained' + str(i) + '.hd5')
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    pass
