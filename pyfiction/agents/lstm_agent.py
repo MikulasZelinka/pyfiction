@@ -70,7 +70,7 @@ class LSTMAgent(agent.Agent):
     Uses precomputed word embeddings (GloVe)
     """
 
-    def __init__(self, simulator):
+    def __init__(self, simulator, state_length=64, action_length=16, max_words=8192):
         self.experience_sequences_prioritised = []
         random.seed(0)
         np.random.seed(0)
@@ -81,16 +81,15 @@ class LSTMAgent(agent.Agent):
         self.embeddings_index = None
         self.word_index = None
         self.model = None
-        self.tokenizer = Tokenizer(num_words=10000)
+        self.tokenizer = Tokenizer(num_words=max_words)  # maximum number of unique words to use
 
         # parameters
         self.step_cost = -0.01
         self.max_steps = 100  # maximum number of actions in one episode before it is terminated
         self.embeddings_dimensions = 50
         self.embeddings_path = 'glove.6B.' + str(self.embeddings_dimensions) + 'd.txt'
-        self.max_words = 8192  # maximum number of unique words to use
-        self.state_length = 64  # length of state description in tokens
-        self.action_length = 16  # length of action description in tokens
+        self.state_length = state_length  # length of state description in tokens
+        self.action_length = action_length  # length of action description in tokens
 
     def act(self, text, actions, epsilon=0):
         """
@@ -142,15 +141,13 @@ class LSTMAgent(agent.Agent):
         logger.info('Transforming words from experience into sequences of embedding indices.')
         self.create_sequences()
 
-        num_words = min(len(self.word_index), self.max_words)
+        num_words = len(self.word_index)
         logger.info('Creating a model based on %s unique tokens in the word index: %s', num_words, self.word_index)
 
         # indices in word_index start with a 1, 0 is reserved for masking padded value
         embedding_matrix = np.zeros((num_words + 1, self.embeddings_dimensions))
 
         for word, i in self.word_index.items():
-            if i >= self.max_words:
-                continue
             embedding_vector = self.embeddings_index.get(word)
             if embedding_vector is not None:
                 # words not found in embedding index will be all-zeros.
