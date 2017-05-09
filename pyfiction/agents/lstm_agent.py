@@ -290,7 +290,12 @@ class LSTMAgent(agent.Agent):
         total_reward = 0
         # logger.debug('playing new game')
         (state, actions, reward) = self.simulator.read()
-        while len(actions) > 0 and steps < self.max_steps:
+        while len(actions) > 0:
+
+            if steps > self.max_steps:
+                logger.info('Maximum number of steps exceeded, last state: %s', state)
+                break
+
             # logger.debug('s %s', text)
             action = self.act(state, actions, epsilon)
             # logger.debug('a %s', action)
