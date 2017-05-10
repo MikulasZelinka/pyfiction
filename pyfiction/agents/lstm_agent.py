@@ -70,7 +70,7 @@ class LSTMAgent(agent.Agent):
     Uses precomputed word embeddings (GloVe)
     """
 
-    def __init__(self, simulator, state_length=64, action_length=16, max_words=8192):
+    def __init__(self, simulator, optimizer=RMSprop(), state_length=64, action_length=16, max_words=8192):
         self.experience_sequences_prioritised = []
         random.seed(0)
         np.random.seed(0)
@@ -82,6 +82,7 @@ class LSTMAgent(agent.Agent):
         self.word_index = None
         self.model = None
         self.tokenizer = Tokenizer(num_words=max_words)  # maximum number of unique words to use
+        self.optimizer = optimizer
 
         # parameters
         self.step_cost = -0.01
@@ -97,10 +98,10 @@ class LSTMAgent(agent.Agent):
         :param text: state text
         :param actions: actions to be considered
         :param epsilon: probability of choosing a random action
-        :return: index of the picked action
+        :return: index of the picked action and a Q-value
         """
         if (epsilon > 0 and 1 > epsilon > random.random()) or epsilon == 1:
-            return random.randint(0, len(actions) - 1)
+            return random.randint(0, len(actions) - 1), None
 
         # create sequences from text data
         text_sequences = pad_sequences(self.tokenizer.texts_to_sequences([text]), maxlen=self.state_length)
@@ -116,7 +117,7 @@ class LSTMAgent(agent.Agent):
                 q_max = q
                 best_action = i
         # logger.debug('best action is %s', best_action)
-        return best_action
+        return best_action, q_max
 
     def create_embeddings(self):
         embeddings_index = {}
@@ -182,7 +183,7 @@ class LSTMAgent(agent.Agent):
         # model.add(Dot([state, action], axes=[1, 1]))
         # model.add(Dot(input_shape=[state, action], axes=1))
 
-        model.compile(optimizer=RMSprop(), loss='mse')
+        model.compile(optimizer=self.optimizer, loss='mse')
 
         self.model = model
 
@@ -284,7 +285,7 @@ class LSTMAgent(agent.Agent):
             self.play_game(store_experience=True, epsilon=1)
         logger.info('Successfully sampled %s game episodes, got %s experiences.', episodes, len(self.experience))
 
-    def play_game(self, store_experience=True, epsilon=1):
+    def play_game(self, store_experience=True, epsilon=1, verbose=False):
 
         steps = 0
         total_reward = 0
@@ -296,9 +297,12 @@ class LSTMAgent(agent.Agent):
                 logger.info('Maximum number of steps exceeded, last state: %s', state)
                 break
 
-            # logger.debug('s %s', text)
-            action = self.act(state, actions, epsilon)
-            # logger.debug('a %s', action)
+            action, q_value = self.act(state, actions, epsilon)
+
+            if verbose:
+                logger.info('State: %s', state)
+                logger.info('Action: q=%s, %s', q_value, actions[action])
+
             self.simulator.write(action)
 
             last_state = state
@@ -361,35 +365,36 @@ class LSTMAgent(agent.Agent):
             actions[i] = action
             targets[i] = target
 
-            self.model.fit([states, actions], targets, epochs=1, verbose=0)
+        self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=0)
 
-            # logger.debug('trained states: %s', states)
-            # logger.debug('trained actions: %s', actions)
-            # logger.debug('trained targets: %s', targets)
-
-    def test(self, iterations=16):
+    def test(self, iterations=16, verbose=False):
         """
         Uses the model to play the game, always picking the action with the highest Q-value.
         :param iterations: Number of games to be played.
+        :param verbose: Whether to print states and actions 
         :return: The average score across all iterations.
         """
         score = 0
         for i in range(iterations):
-            score += self.play_game(store_experience=True, epsilon=0)
+            score += self.play_game(store_experience=True, epsilon=0, verbose=verbose)
 
         return score / iterations
 
     def q(self, state, action):
         """
         returns the Q-value of a single (state,action) pair
-        :param state: 
-        :param action: 
+        :param state:
+        :param action:
         :return: Q-value estimated by the NN model
         """
         return self.model.predict([state.reshape((1, self.state_length)), action.reshape((1, self.action_length))])[[0]]
 
 
 def main():
+    """
+    Example usage of the LSTMAgent
+    :return: 
+    """
     agent = LSTMAgent(SavingJohnSimulator)
     agent.sample(episodes=8192)
     agent.create_model()
@@ -397,7 +402,7 @@ def main():
     for i in range(256):
         logger.info('Epoch %s', i)
         agent.train(batch_size=32, prioritised=i < 32)
-        reward = agent.test(iterations=1)
+        reward = agent.test(iterations=1, verbose=True)
         logger.info('Average reward: %s', reward)
 
         # agent.model.save('lstm-trained' + str(i) + '.hd5')
