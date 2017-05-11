@@ -340,12 +340,13 @@ class LSTMAgent(agent.Agent):
 
         return total_reward / episodes
 
-    def train_offline(self, batch_size=64, gamma=0.99, prioritised=False):
+    def train_offline(self, episodes=1, batch_size=32, gamma=0.99, prioritised=False):
         """
         Picks random experiences and trains the model on them
-        :param batch_size: number of experiences to be used for training (each is used once)
+        :param episodes: number of episodes, in each episode we train batch_size examples
+        :param batch_size: number of experiences to be used for training (each is used once in an episode)
         :param gamma: discount factor (higher gamma ~ taking future into account more)
-        :param prioritised: only sample prioritised experience (final states with higher reward values)
+        :param prioritised: only sample prioritised experiences (final states with usually higher reward values)
         :return: 
         """
 
@@ -355,33 +356,35 @@ class LSTMAgent(agent.Agent):
             source = self.experience_sequences_prioritised
             logger.debug('sampling prioritised only, %s from %s', batch_size, len(source))
 
-        batches = np.random.choice(len(source), batch_size)
+        for x in range(episodes):
 
-        # logger.debug('Batches: %s', batches)
-        # logger.debug('First item: %s', self.experience_sequences[batches[0]])
+            batches = np.random.choice(len(source), batch_size)
 
-        states = np.zeros((batch_size, self.state_length))
-        actions = np.zeros((batch_size, self.action_length))
-        targets = np.zeros((batch_size, 1))
+            # logger.debug('Batches: %s', batches)
+            # logger.debug('First item: %s', self.experience_sequences[batches[0]])
 
-        for i in range(batch_size):
-            state, action, reward, state_next, actions_next, done = source[batches[i]]
-            target = reward
+            states = np.zeros((batch_size, self.state_length))
+            actions = np.zeros((batch_size, self.action_length))
+            targets = np.zeros((batch_size, 1))
 
-            if not done:
-                # get an action with maximum Q value
-                q_max = -np.math.inf
-                for action_next in actions_next:
-                    q = self.q(state_next, action_next)
-                    if q > q_max:
-                        q_max = q
-                target += gamma * q_max
+            for i in range(batch_size):
+                state, action, reward, state_next, actions_next, done = source[batches[i]]
+                target = reward
 
-            states[i] = state
-            actions[i] = action
-            targets[i] = target
+                if not done:
+                    # get an action with maximum Q value
+                    q_max = -np.math.inf
+                    for action_next in actions_next:
+                        q = self.q(state_next, action_next)
+                        if q > q_max:
+                            q_max = q
+                    target += gamma * q_max
 
-        self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=0)
+                states[i] = state
+                actions[i] = action
+                targets[i] = target
+
+            self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=0)
 
     def train_online(self, episodes=1024, batch_size=64, gamma=0.99, epsilon=1, epsilon_decay=0.99, prioritised=False):
         """
@@ -400,8 +403,6 @@ class LSTMAgent(agent.Agent):
             (state, actions, reward) = self.simulator.read()
             while len(actions) > 0 and steps <= self.max_steps:
                 action, q_value = self.act(state, actions, epsilon)
-
-
 
     def q(self, state, action):
         """

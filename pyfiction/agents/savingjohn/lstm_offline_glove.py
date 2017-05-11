@@ -18,8 +18,10 @@ agent = LSTMAgent(simulator=SavingJohnSimulator, optimizer=optimizer, max_steps=
 agent.play_game(episodes=8192, store_experience=True, epsilon=1, verbose=False)
 agent.create_model()
 
-for i in range(256):
+epochs = 256
+
+for i in range(epochs):
     logger.info('Epoch %s', i)
-    agent.train_offline(batch_size=32, prioritised=i < 32)
+    agent.train_offline(episodes=1, batch_size=32, prioritised=i < 32)
     reward = agent.play_game(episodes=1, store_experience=False, epsilon=0, verbose=False)
     logger.info('Average reward: %s', reward)
