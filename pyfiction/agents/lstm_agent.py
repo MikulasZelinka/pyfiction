@@ -70,7 +70,8 @@ class LSTMAgent(agent.Agent):
     Uses precomputed word embeddings (GloVe)
     """
 
-    def __init__(self, simulator, optimizer=RMSprop(), state_length=64, action_length=16, max_words=8192):
+    def __init__(self, simulator, optimizer=RMSprop(), state_length=64, action_length=16, max_words=8192,
+                 max_steps=100):
         self.experience_sequences_prioritised = []
         random.seed(0)
         np.random.seed(0)
@@ -86,7 +87,7 @@ class LSTMAgent(agent.Agent):
 
         # parameters
         self.step_cost = -0.01
-        self.max_steps = 100  # maximum number of actions in one episode before it is terminated
+        self.max_steps = max_steps  # maximum number of actions in one episode before it is terminated
         self.embeddings_dimensions = 50
         self.embeddings_path = 'glove.6B.' + str(self.embeddings_dimensions) + 'd.txt'
         self.state_length = state_length  # length of state description in tokens
@@ -367,16 +368,18 @@ class LSTMAgent(agent.Agent):
 
         self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=0)
 
-    def test(self, iterations=16, verbose=False):
+    def test(self, iterations=16, store_experience=True, epsilon=0, verbose=False):
         """
         Uses the model to play the game, always picking the action with the highest Q-value.
         :param iterations: Number of games to be played.
-        :param verbose: Whether to print states and actions 
+        :param store_experience: Whether to store new experiences while testing.
+        :param epsilon: Probability of choosing a random action.
+        :param verbose: Whether to print states and actions .
         :return: The average score across all iterations.
         """
         score = 0
         for i in range(iterations):
-            score += self.play_game(store_experience=True, epsilon=0, verbose=verbose)
+            score += self.play_game(store_experience=store_experience, epsilon=epsilon, verbose=verbose)
 
         return score / iterations
 
