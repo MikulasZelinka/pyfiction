@@ -269,13 +269,16 @@ class LSTMAgent(agent.Agent):
 
                 if steps >= max_steps:
                     logger.info('Maximum number of steps exceeded, penalising, last state: %s', state)
-                    reward -= 100
+                    # reward -= 100
 
                 # override reward from the environment in a non-terminal state by applying the step cost
                 if reward == 0 and not finished:
                     reward = step_cost
                 if store_experience:
                     self.store_experience(last_state, last_action, reward, state, actions, finished, store_text)
+
+                # TODO - somehow normalize reward?
+                reward /= 20
 
                 total_reward += reward
                 steps += 1
@@ -405,23 +408,66 @@ class LSTMAgent(agent.Agent):
                 actions[i] = action
                 targets[i] = target
 
-            self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=0)
+            self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=2)
 
     def train_online(self, max_steps, episodes=1024, batch_size=64, gamma=0.99, epsilon=1, epsilon_decay=0.995,
+                     prioritized_fraction=0.25,
                      step_cost=-0.01):
         """
         Trains the model while playing at the same time
+        :param epsilon_decay: 
+        :param epsilon: 
+        :param step_cost: 
+        :param episodes: 
+        :param max_steps: 
         :param batch_size: number of experiences to be used for training (each is used once)
         :param gamma: discount factor (higher gamma ~ taking future into account more)
-        :param prioritized: only sample prioritized experience (final states with higher reward values)
+        :param prioritized_fraction: only sample prioritized experience (final states with higher reward values)
         :return: 
         """
 
+        batch_prioritized = int(batch_size * prioritized_fraction)
+        batch = batch_size - batch_prioritized
+
         for i in range(episodes):
-            self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=True, epsilon=epsilon)
+            reward = self.play_game(max_steps=max_steps, episodes=4, step_cost=step_cost, store_experience=True,
+                                    epsilon=epsilon)
+
+            logger.info('Episode %s, average reward: %s', i, reward)
+
+            states = np.zeros((batch_size, self.state_length))
+            actions = np.zeros((batch_size, self.action_length))
+            targets = np.zeros((batch_size, 1))
+
+            batches = np.random.choice(len(self.experience_sequences), batch)
+            batches_prioritized = np.random.choice(len(self.experience_sequences_prioritized), batch_prioritized)
+
+            for b in range(batch_size):
+
+                if b < batch:
+                    state, action, reward, state_next, actions_next, finished = self.experience_sequences[batches[b]]
+                else:
+                    state, action, reward, state_next, actions_next, finished = self.experience_sequences_prioritized[
+                        batches_prioritized[b - batch]]
+
+                target = reward
+
+                if not finished:
+                    # get an action with maximum Q value
+                    q_max = -np.math.inf
+                    for action_next in actions_next:
+                        q = self.q(state_next, action_next)
+                        if q > q_max:
+                            q_max = q
+                    target += gamma * q_max
+
+                states[b] = state
+                actions[b] = action
+                targets[b] = target
+
+            self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
 
             epsilon *= epsilon_decay
-
 
     def q(self, state, action):
         """

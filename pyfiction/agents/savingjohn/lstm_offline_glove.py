@@ -1,6 +1,6 @@
 import logging
 
-from keras.optimizers import SGD
+from keras.optimizers import SGD, RMSprop
 
 from pyfiction.agents.lstm_agent import LSTMAgent
 from pyfiction.simulators.savingjohn_simulator import SavingJohnSimulator
@@ -23,7 +23,9 @@ agent = LSTMAgent(simulator=SavingJohnSimulator, state_length=64, action_length=
 agent.initialize_tokens(iterations=1024, max_steps=100)
 
 # Create a model with given parameters, also using pre-trained GloVe embeddings (not necessary):
-optimizer = SGD(lr=0.1, decay=0, momentum=0, nesterov=False)
+optimizer = SGD(lr=0.01, decay=0, momentum=0, nesterov=False)
+# optimizer = RMSprop(lr=0.0005, clipvalue=0.5)
+# TODO - add regularization to avoid inf/nans on loss function (and possibly on weights?)
 embedding_dimensions = 50
 embeddings = 'glove.6B.' + str(embedding_dimensions) + 'd.txt'
 # To train embeddings from scratch, simply delete the 'embeddings' parameter from the function call
@@ -41,7 +43,7 @@ agent.play_game(episodes=1024, max_steps=100, epsilon=1, store_experience=True)
 epochs = 256
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    agent.train_offline(episodes=1, batch_size=32, prioritized=i < 8)
+    agent.train_offline(episodes=1, batch_size=1, prioritized=i < 8)
 
     # Only one run of the game is necessary for testing since both the agent (epsilon=0) and the game are deterministic
     # Note that store_experience is set to False and the agent only learns from the experiences sampled before learning
