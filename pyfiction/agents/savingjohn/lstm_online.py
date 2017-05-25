@@ -1,6 +1,8 @@
+import datetime
 import logging
 
 from keras.optimizers import SGD, RMSprop
+from keras.utils import plot_model
 
 from pyfiction.agents.lstm_agent import LSTMAgent
 from pyfiction.simulators.savingjohn_simulator import SavingJohnSimulator
@@ -21,20 +23,21 @@ agent = LSTMAgent(simulator=SavingJohnSimulator, state_length=64, action_length=
 agent.initialize_tokens(iterations=1024, max_steps=100)
 
 # Create a model with given parameters
-optimizer = RMSprop(lr=0.0005)
+# optimizer = RMSprop()  # (lr=0.0005)
+optimizer = SGD(lr=0.001)
 embedding_dimensions = 16
 agent.create_model(embedding_dimensions=embedding_dimensions,
                    dense_dimensions=8,
                    optimizer=optimizer)
+
+# Visualize the model
+plot_model(agent.model, to_file='model.png', show_shapes=True)
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
 # Somehow consider prioritized experiences
 epochs = 128
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    agent.train_online(episodes=1024, max_steps=100, batch_size=64, gamma=0.5, epsilon=1, epsilon_decay=0.995,
+    agent.train_online(episodes=1024, max_steps=100, batch_size=64, gamma=0.95, epsilon=1, epsilon_decay=0.995,
                        prioritized_fraction=0.25)
-
-    # Only one run of the game is necessary for testing since both the agent (epsilon=0) and the game are deterministic
-    reward = agent.play_game(episodes=1, store_experience=False, max_steps=100, epsilon=0, verbose=False)
-    logger.info('Average reward: %s', reward)
+    agent.model.save('ep' + str(i) + '_' + str(datetime.datetime.now()) + '.h5')

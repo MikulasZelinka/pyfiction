@@ -43,7 +43,7 @@ agent.play_game(episodes=1024, max_steps=100, epsilon=1, store_experience=True)
 epochs = 256
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    agent.train_offline(episodes=1, batch_size=1, prioritized=i < 8)
+    agent.train_offline(episodes=1, batch_size=1, prioritized=i < 16)
 
     # Only one run of the game is necessary for testing since both the agent (epsilon=0) and the game are deterministic
     # Note that store_experience is set to False and the agent only learns from the experiences sampled before learning

@@ -80,6 +80,7 @@ class LSTMAgent(agent.Agent):
         self.experience_sequences = []
         self.experience_sequences_prioritized = []
         self.unique_endings = []
+        self.unique_prioritized_states = []
 
         self.model = None
         self.tokenizer = Tokenizer(num_words=max_words)  # maximum number of unique words to use
@@ -268,8 +269,10 @@ class LSTMAgent(agent.Agent):
                 finished = len(actions) < 1
 
                 if steps >= max_steps:
-                    logger.info('Maximum number of steps exceeded, penalising, last state: %s', state)
+                    logger.info('Maximum number of steps exceeded, last state: %s', state)
+                    # TODO - penalize?
                     # reward -= 100
+
 
                 # override reward from the environment in a non-terminal state by applying the step cost
                 if reward == 0 and not finished:
@@ -302,9 +305,6 @@ class LSTMAgent(agent.Agent):
             self.experience.append((state_text, action_text, reward, state_next_text, actions_next_texts, finished))
             return
 
-        # TODO - prioritize final states or states with a positive reward?
-        finished = reward > 0
-
         # are lists necessary?
         # vectorize the text samples into padded 2D tensors of word indices
         state_sequence = self.vectorize([state_text], self.state_length)
@@ -312,53 +312,32 @@ class LSTMAgent(agent.Agent):
         state_next_sequence = self.vectorize([state_next_text], self.state_length)
         actions_next_sequences = self.vectorize(actions_next_texts, self.action_length)
 
+        # finished = reward > 0
+        finished = len(actions_next_sequences) < 1
+
         experience = (state_sequence, action_sequence, reward, state_next_sequence, actions_next_sequences, finished)
         self.experience_sequences.append(experience)
 
-        if finished:
+        if not finished and reward <= 0:
+            return
 
-            # check if we already ended in the given state with the given reward
-            exp_list = (experience[3].tolist(), experience[2])
+        # store unique final states and/or unique states with a positive reward
+        exp_list = (experience[0].tolist(), experience[1].tolist(), experience[2], experience[3].tolist())
 
-            if exp_list not in self.unique_endings:
-                self.unique_endings.append(exp_list)
+        if finished and exp_list not in self.unique_endings:
+            self.unique_endings.append(exp_list)
+            logger.info('New unique final experience - total %s.\nReward: %s, text: %s',
+                        len(self.unique_endings),
+                        reward,
+                        state_next_text)
 
-                self.experience_sequences_prioritized.append(experience)
-                logger.debug('New unique final experience - total %s.\nReward: %s, text: %s',
-                             len(self.experience_sequences_prioritized),
-                             exp_list[1],
-                             state_next_text)
-
-                # check if maximum length parameters make sense for the actual values from the game:
-                # max_state_length = 0
-                # for seq in state_sequences:
-                #     if len(seq) > max_state_length:
-                #         max_state_length = len(seq)
-                #
-                # max_action_length = 0
-                # for seq in action_sequences:
-                #     if len(seq) > max_action_length:
-                #         max_action_length = len(seq)
-                #
-                # logger.info('Max state description length: %s, trimming to max %s', max_state_length, self.state_length)
-                # logger.info('Max action description length: %s, trimming to max %s', max_action_length, self.action_length)
-                #
-                # if max_state_length < self.state_length:
-                #     self.state_length = max_state_length
-                #     logger.warning('Max found state description length was %s, lowering the max to this value.',
-                #                    self.state_length)
-                #
-                # if max_action_length < self.action_length:
-                #     self.action_length = max_action_length
-                #     logger.warning('Max found action description length was %s, lowering the max to this value.',
-                #                    self.action_length)
-
-                # logger.debug('Experience: %s', self.experience)
-                # logger.debug('Experience sequences: %s', self.experience_sequences)
-
-
-                # logger.info('Shape of the state tensor: %s', states.shape)
-                # logger.info('Shape of the action tensor: %s', actions.shape)
+        if reward > 0 and exp_list not in self.unique_prioritized_states:
+            self.unique_prioritized_states.append(exp_list)
+            logger.info('New unique positive experience - total %s.\nReward: %s, text: %s',
+                        len(self.unique_prioritized_states),
+                        reward,
+                        state_next_text)
+            self.experience_sequences_prioritized.append(experience)
 
     def train_offline(self, episodes=1, batch_size=32, gamma=0.99, prioritized=False):
         """
@@ -395,11 +374,15 @@ class LSTMAgent(agent.Agent):
                 state, action, reward, state_next, actions_next, finished = source[batches[i]]
                 target = reward
 
+                # logger.debug('%s actions: %s', len(actions_next), actions_next)
+                # logger.debug('complete experience data: %s', source[batches[i]])
+
                 if not finished:
                     # get an action with maximum Q value
                     q_max = -np.math.inf
                     for action_next in actions_next:
                         q = self.q(state_next, action_next)
+                        # logger.debug('Q-value: %s', q)
                         if q > q_max:
                             q_max = q
                     target += gamma * q_max
@@ -407,6 +390,8 @@ class LSTMAgent(agent.Agent):
                 states[i] = state
                 actions[i] = action
                 targets[i] = target
+
+            # logger.debug('Targets: %s', targets)
 
             self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=2)
 
@@ -433,7 +418,12 @@ class LSTMAgent(agent.Agent):
             reward = self.play_game(max_steps=max_steps, episodes=4, step_cost=step_cost, store_experience=True,
                                     epsilon=epsilon)
 
-            logger.info('Episode %s, average reward: %s', i, reward)
+            logger.info('Episode %s', i)
+            logger.info('Epsilon = %s, average reward: %s', epsilon, reward * 20)
+            # Test the agent after each batch of weight updates
+            reward = self.play_game(max_steps=20, episodes=1, step_cost=step_cost, store_experience=False,
+                                    epsilon=0)
+            logger.info('Test reward: %s', reward * 20)
 
             states = np.zeros((batch_size, self.state_length))
             actions = np.zeros((batch_size, self.action_length))
@@ -464,6 +454,10 @@ class LSTMAgent(agent.Agent):
                 states[b] = state
                 actions[b] = action
                 targets[b] = target
+
+            # logger.debug('states %s', states)
+            # logger.debug('actions %s', actions)
+            # logger.debug('targets %s', targets)
 
             self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
 
