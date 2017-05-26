@@ -273,7 +273,6 @@ class LSTMAgent(agent.Agent):
                     # TODO - penalize?
                     # reward -= 100
 
-
                 # override reward from the environment in a non-terminal state by applying the step cost
                 if reward == 0 and not finished:
                     reward = step_cost
@@ -396,10 +395,10 @@ class LSTMAgent(agent.Agent):
             self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=2)
 
     def train_online(self, max_steps, episodes=1024, batch_size=64, gamma=0.99, epsilon=1, epsilon_decay=0.995,
-                     prioritized_fraction=0.25,
-                     step_cost=-0.01):
+                     prioritized_fraction=0.25, step_cost=-0.01, test_steps=16):
         """
         Trains the model while playing at the same time
+        :param test_steps: test the agent after each N steps (batches)
         :param epsilon_decay: 
         :param epsilon: 
         :param step_cost: 
@@ -408,8 +407,10 @@ class LSTMAgent(agent.Agent):
         :param batch_size: number of experiences to be used for training (each is used once)
         :param gamma: discount factor (higher gamma ~ taking future into account more)
         :param prioritized_fraction: only sample prioritized experience (final states with higher reward values)
-        :return: 
+        :return: rewards
         """
+
+        rewards = []
 
         batch_prioritized = int(batch_size * prioritized_fraction)
         batch = batch_size - batch_prioritized
@@ -420,24 +421,37 @@ class LSTMAgent(agent.Agent):
 
             logger.info('Episode %s', i)
             logger.info('Epsilon = %s, average reward: %s', epsilon, reward * 20)
-            # Test the agent after each batch of weight updates
-            reward = self.play_game(max_steps=20, episodes=1, step_cost=step_cost, store_experience=False,
-                                    epsilon=0)
-            logger.info('Test reward: %s', reward * 20)
+
+            # Test the agent after each N batches of weight updates
+            if i % test_steps == 0:
+                reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=False,
+                                        epsilon=0)
+                rewards.append(reward * 20)
+                logger.info('Test reward: %s', reward * 20)
 
             states = np.zeros((batch_size, self.state_length))
             actions = np.zeros((batch_size, self.action_length))
             targets = np.zeros((batch_size, 1))
 
+            if len(self.experience_sequences) < 1:
+                return
+
             batches = np.random.choice(len(self.experience_sequences), batch)
-            batches_prioritized = np.random.choice(len(self.experience_sequences_prioritized), batch_prioritized)
+
+            if len(self.experience_sequences_prioritized) > 0:
+                batches_prioritized = np.random.choice(len(self.experience_sequences_prioritized), batch_prioritized)
+            else:
+                batches_prioritized = np.random.choice(len(self.experience_sequences), batch_prioritized)
 
             for b in range(batch_size):
 
                 if b < batch:
                     state, action, reward, state_next, actions_next, finished = self.experience_sequences[batches[b]]
-                else:
+                elif len(self.experience_sequences_prioritized) > 0:
                     state, action, reward, state_next, actions_next, finished = self.experience_sequences_prioritized[
+                        batches_prioritized[b - batch]]
+                else:
+                    state, action, reward, state_next, actions_next, finished = self.experience_sequences[
                         batches_prioritized[b - batch]]
 
                 target = reward
@@ -462,6 +476,8 @@ class LSTMAgent(agent.Agent):
             self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
 
             epsilon *= epsilon_decay
+
+        return rewards
 
     def q(self, state, action):
         """
