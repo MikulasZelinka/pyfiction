@@ -3,12 +3,14 @@ import os
 import random
 
 import numpy as np
+from keras import Input
+from keras.callbacks import TensorBoard
 
 from keras.optimizers import RMSprop
 from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer, text_to_word_sequence
 
-from keras.layers import LSTM, Dense, Embedding, Dot, Merge
+from keras.layers import LSTM, Dense, Embedding, Merge
 from keras.models import Sequential
 
 from pyfiction.agents import agent
@@ -19,10 +21,11 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-def preprocess(text, chars=''):
+def preprocess(text, chars='', expand=False):
     """
     function that removes whitespaces, converts to lowercase, etc.
-    :param text: text input 
+    :param expand: expand 'll, 'm and similar expressions to reduce the number of different tokens
+    :param text: text input
     :param chars: chars to be removed
     :return: cleaned up text
     """
@@ -39,13 +42,14 @@ def preprocess(text, chars=''):
     text = text.lower()
 
     # expand unambiguous 'm, 't, 're, ... expressions
-    text = text. \
-        replace('\'m ', ' am '). \
-        replace('\'re ', ' are '). \
-        replace('won\'t', 'will not'). \
-        replace('n\'t', ' not'). \
-        replace('\'ll ', ' will '). \
-        replace('\'ve ', ' have ')
+    if expand:
+        text = text. \
+            replace('\'m ', ' am '). \
+            replace('\'re ', ' are '). \
+            replace('won\'t', 'will not'). \
+            replace('n\'t', ' not'). \
+            replace('\'ll ', ' will '). \
+            replace('\'ve ', ' have ')
 
     return text
 
@@ -88,6 +92,11 @@ class LSTMAgent(agent.Agent):
         # parameters
         self.state_length = state_length  # length of state description in tokens
         self.action_length = action_length  # length of action description in tokens
+
+        # visualization
+        # self.tensorboard = TensorBoard(log_dir='./tensorboard', histogram_freq=10, write_graph=False,
+        #                                embeddings_freq=1,
+        #                                embeddings_layer_names=['embedding_state', 'embedding_action'])
 
     def act(self, text, actions, epsilon=0):
         """
@@ -133,12 +142,14 @@ class LSTMAgent(agent.Agent):
                                         embedding_dimensions,
                                         input_length=self.state_length,
                                         mask_zero=True,
-                                        trainable=True)
+                                        trainable=True,
+                                        name='embedding_state')
             embedding_action = Embedding(num_words + 1,
                                          embedding_dimensions,
                                          input_length=self.action_length,
                                          mask_zero=True,
-                                         trainable=True)
+                                         trainable=True,
+                                         name='embedding_action')
         else:
             logger.info('Creating word embeddings.')
             embeddings_index = load_embeddings(embeddings)
@@ -160,12 +171,14 @@ class LSTMAgent(agent.Agent):
                                         weights=[embedding_matrix],
                                         mask_zero=True,
                                         trainable=embeddings_trainable)
-            embedding_action = Embedding(num_words + 1,
-                                         embedding_dimensions,
-                                         input_length=self.action_length,
-                                         weights=[embedding_matrix],
-                                         mask_zero=True,
-                                         trainable=embeddings_trainable)
+            # embedding_action = Embedding(num_words + 1,
+            #                              embedding_dimensions,
+            #                              input_length=self.action_length,
+            #                              weights=[embedding_matrix],
+            #                              mask_zero=True,
+            #                              trainable=embeddings_trainable)
+
+            embedding_action = embedding_state
 
         state = Sequential()
         state.add(embedding_state)
@@ -474,6 +487,7 @@ class LSTMAgent(agent.Agent):
             # logger.debug('targets %s', targets)
 
             self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
+            # callbacks=[self.tensorboard])
 
             epsilon *= epsilon_decay
 
