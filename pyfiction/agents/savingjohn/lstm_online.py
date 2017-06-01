@@ -17,7 +17,7 @@ This agent class is universal and it should be possible to apply it to different
 """
 
 # Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(simulator=SavingJohnSimulator, state_length=64, action_length=12)
+agent = LSTMAgent(simulator=SavingJohnSimulator)
 
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens(iterations=1024, max_steps=100)
@@ -25,9 +25,12 @@ agent.initialize_tokens(iterations=1024, max_steps=100)
 # Create a model with given parameters
 optimizer = RMSprop()  # (lr=0.0005)
 # optimizer = SGD(lr=0.001)
-embedding_dimensions = 16
+embedding_dimensions = 32
+lstm_dimensions = 16
+dense_dimensions = 8
 agent.create_model(embedding_dimensions=embedding_dimensions,
-                   dense_dimensions=8,
+                   lstm_dimensions=lstm_dimensions,
+                   dense_dimensions=dense_dimensions,
                    optimizer=optimizer)
 
 # Visualize the model
