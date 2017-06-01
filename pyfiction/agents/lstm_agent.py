@@ -171,14 +171,12 @@ class LSTMAgent(agent.Agent):
                                         weights=[embedding_matrix],
                                         mask_zero=True,
                                         trainable=embeddings_trainable)
-            # embedding_action = Embedding(num_words + 1,
-            #                              embedding_dimensions,
-            #                              input_length=self.action_length,
-            #                              weights=[embedding_matrix],
-            #                              mask_zero=True,
-            #                              trainable=embeddings_trainable)
-
-            embedding_action = embedding_state
+            embedding_action = Embedding(num_words + 1,
+                                         embedding_dimensions,
+                                         input_length=self.action_length,
+                                         weights=[embedding_matrix],
+                                         mask_zero=True,
+                                         trainable=embeddings_trainable)
 
         state = Sequential()
         state.add(embedding_state)
@@ -436,7 +434,7 @@ class LSTMAgent(agent.Agent):
             logger.info('Epsilon = %s, average reward: %s', epsilon, reward * 20)
 
             # Test the agent after each N batches of weight updates
-            if i % test_steps == 0:
+            if ((i + 1) % test_steps) == 0:
                 reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=False,
                                         epsilon=0)
                 rewards.append(reward * 20)

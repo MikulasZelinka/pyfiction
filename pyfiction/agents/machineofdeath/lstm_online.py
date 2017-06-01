@@ -7,8 +7,6 @@ from keras.utils import plot_model
 from pyfiction.agents.lstm_agent import LSTMAgent
 from pyfiction.simulators.machineofdeath_simulator import MachineOfDeathSimulator
 
-# from pyfiction.simulators.text_games.simulators.MySimulator import StoryNode
-
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -35,12 +33,11 @@ agent.create_model(embedding_dimensions=embedding_dimensions,
 plot_model(agent.model, to_file='model.png', show_shapes=True)
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
-# This example seems to converge to a reward of 19.93 (with 19.94 being the optimal reward)
 epochs = 128
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    rewards = agent.train_online(episodes=1024, max_steps=500, batch_size=64, gamma=0.95, epsilon=1,
-                                 epsilon_decay=0.995, prioritized_fraction=0.25)
+    rewards = agent.train_online(episodes=128, max_steps=500, batch_size=64, gamma=0.95, epsilon=1,
+                                 epsilon_decay=0.99, prioritized_fraction=0.25, test_steps=12)
     file_name = 'Epoch' + str(i) + '_' + str(datetime.datetime.now())
     with open(file_name + '.txt', 'w') as file:
         for reward in rewards:
