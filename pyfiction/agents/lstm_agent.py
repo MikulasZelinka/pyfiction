@@ -169,7 +169,7 @@ class LSTMAgent(agent.Agent):
 
         dot_state_action = Dot(axes=-1, normalize=True)([dense_state, dense_action])
 
-        model = Model(inputs=[input_state, input_action], output=dot_state_action)
+        model = Model(inputs=[input_state, input_action], outputs=dot_state_action)
         model.compile(optimizer=optimizer, loss='mse')
 
         self.model = model
@@ -212,12 +212,16 @@ class LSTMAgent(agent.Agent):
         if not texts:
             return []
 
-        sequences = self.tokenizer.texts_to_sequences(texts)
+        sequences = pad_sequences(self.tokenizer.texts_to_sequences(texts), maxlen=max_len)
 
-        if max_len is None:
-            max_len = len(max(sequences, key=len))
+        # tokenizer can return empty sequences for actions such as '...', fix these:
+        if not sequences.any():
+            return np.asarray([[0]])
+        for i in range(len(sequences)):
+            if len(sequences[i]) < 1:
+                sequences[i] = [0]
 
-        return pad_sequences(sequences, maxlen=max_len)
+        return sequences
 
     def reset(self):
         self.simulator.restart()
@@ -468,7 +472,7 @@ class LSTMAgent(agent.Agent):
 
     def q(self, state, action):
         """
-        returns the Q-value of a single (state,action) pair
+        returns the Q-value of a single (state, action) pair
         :param state:
         :param action:
         :return: Q-value estimated by the NN model
