@@ -17,7 +17,7 @@ This agent class is universal and it should be possible to apply it to different
 """
 
 # Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(simulator=SavingJohnSimulator, state_length=64, action_length=64)
+agent = LSTMAgent(simulator=SavingJohnSimulator, state_length=64, action_length=12)
 
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens(iterations=1024, max_steps=100)
@@ -34,7 +34,7 @@ agent.create_model(embedding_dimensions=embedding_dimensions,
 plot_model(agent.model, to_file='model.png', show_shapes=True)
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
-# This example seems to converge to a reward of 19.93 (with 19.94 being the optimal reward)
+# This example seems to converge to a reward of 19.9X (with 19.94 being the optimal reward)
 epochs = 128
 for i in range(epochs):
     logger.info('Epoch %s', i)
