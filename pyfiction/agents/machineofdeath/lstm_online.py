@@ -36,11 +36,11 @@ agent.create_model(embedding_dimensions=embedding_dimensions,
 plot_model(agent.model, to_file='model.png', show_shapes=True)
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
-epochs = 128
+epochs = 256
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    rewards = agent.train_online(episodes=128, max_steps=500, batch_size=64, gamma=0.95, epsilon=1,
-                                 epsilon_decay=0.99, prioritized_fraction=0.25, test_steps=12)
+    rewards = agent.train_online(episodes=256, max_steps=500, batch_size=64, gamma=0.99, epsilon=1, reward_scale=20,
+                                 epsilon_decay=0.99, prioritized_fraction=0.25, test_steps=8)
     file_name = 'Epoch' + str(i) + '_' + str(datetime.datetime.now())
     with open(file_name + '.txt', 'w') as file:
         for reward in rewards:

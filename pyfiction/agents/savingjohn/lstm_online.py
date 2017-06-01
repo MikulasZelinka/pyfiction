@@ -41,7 +41,7 @@ plot_model(agent.model, to_file='model.png', show_shapes=True)
 epochs = 128
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    rewards = agent.train_online(episodes=128, max_steps=100, batch_size=64, gamma=0.95, epsilon=1,
+    rewards = agent.train_online(episodes=128, max_steps=100, batch_size=64, gamma=0.95, epsilon=1, reward_scale=20,
                                  epsilon_decay=0.99, prioritized_fraction=0.25, test_steps=4)
     file_name = 'Epoch' + str(i) + '_' + str(datetime.datetime.now())
     with open(file_name + '.txt', 'w') as file:

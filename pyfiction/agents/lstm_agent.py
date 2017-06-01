@@ -227,9 +227,10 @@ class LSTMAgent(agent.Agent):
         self.simulator.restart()
 
     def play_game(self, max_steps, episodes=1, step_cost=-0.01, store_experience=True, store_text=False, epsilon=1,
-                  verbose=False):
+                  reward_scale=1, verbose=False):
         """
         Uses the model to play the game.
+        :param reward_scale:
         :param episodes: Number of games to be played.
         :param max_steps: Maximum number of steps (to prevent the agent from cycling)
         :param store_text: Only store text descriptions and not sequences, used for initializing tokenizer
@@ -244,6 +245,7 @@ class LSTMAgent(agent.Agent):
         for i in range(episodes):
 
             steps = 0
+            experiences = []
 
             (state, actions, reward) = self.simulator.read()
             while len(actions) > 0 and steps <= max_steps:
@@ -270,21 +272,26 @@ class LSTMAgent(agent.Agent):
                 # override reward from the environment in a non-terminal state by applying the step cost
                 if reward == 0 and not finished:
                     reward = step_cost
-                if store_experience:
-                    self.store_experience(last_state, last_action, reward, state, actions, finished, store_text)
 
-                # TODO - somehow normalize reward?
-                reward /= 20
+                reward /= reward_scale
+
+                if store_experience:
+                    experiences.append((last_state, last_action, reward, state, actions, finished))
 
                 total_reward += reward
                 steps += 1
+
+            # TODO - store only finished?
+            if store_experience and steps < max_steps:
+                for last_state, last_action, reward, state, actions, finished in experiences:
+                    self.store_experience(last_state, last_action, reward, state, actions, finished, store_text)
 
             self.reset()
 
         if store_text:
             logger.info('Successfully played %s game episodes, got %s new experiences.', episodes, len(self.experience))
 
-        return total_reward / episodes
+        return total_reward * reward_scale / episodes
 
     def store_experience(self, state, action, reward, state_next, actions_next, finished, store_text_only=False):
 
@@ -304,11 +311,10 @@ class LSTMAgent(agent.Agent):
         state_next_sequence = self.vectorize([state_next_text])[0]
         actions_next_sequences = self.vectorize(actions_next_texts)
 
-        finished = len(actions_next_sequences) < 1
-
         experience = (state_sequence, action_sequence, reward, state_next_sequence, actions_next_sequences, finished)
         self.experience_sequences.append(experience)
 
+        # now return if this experience is not final or doesn't contain a positive reward
         if not finished and reward <= 0:
             return
 
@@ -381,9 +387,10 @@ class LSTMAgent(agent.Agent):
             self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
 
     def train_online(self, max_steps, episodes=1024, batch_size=64, gamma=0.99, epsilon=1, epsilon_decay=0.995,
-                     prioritized_fraction=0.25, step_cost=-0.01, test_steps=16):
+                     prioritized_fraction=0, reward_scale=1, step_cost=-0.01, test_steps=1):
         """
         Trains the model while playing at the same time
+        :param reward_scale:
         :param test_steps: test the agent after each N steps (batches)
         :param epsilon_decay: 
         :param epsilon: 
@@ -403,17 +410,16 @@ class LSTMAgent(agent.Agent):
 
         for i in range(episodes):
             reward = self.play_game(max_steps=max_steps, episodes=4, step_cost=step_cost, store_experience=True,
-                                    epsilon=epsilon)
+                                    epsilon=epsilon, reward_scale=reward_scale)
 
-            logger.info('Episode %s', i)
-            logger.info('Epsilon = %s, average reward: %s', epsilon, reward * 20)
+            logger.info('Episode %s, epsilon = %s, average reward: %s', i, epsilon, reward)
 
             # Test the agent after each N batches of weight updates
             if ((i + 1) % test_steps) == 0:
                 reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=False,
-                                        epsilon=0)
-                rewards.append(reward * 20)
-                logger.info('Test reward: %s', reward * 20)
+                                        epsilon=0, reward_scale=reward_scale)
+                rewards.append(reward)
+                logger.info('Test reward: %s', reward)
 
             if len(self.experience_sequences) < 1:
                 return
