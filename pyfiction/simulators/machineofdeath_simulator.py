@@ -1,3 +1,5 @@
+import re
+
 from pyfiction.simulators.simulator import Simulator
 from pyfiction.simulators.text_games.simulators.MySimulator import MachineOfDeathSimulator as MODS
 
@@ -19,7 +21,10 @@ class MachineOfDeathSimulator(Simulator):
         self.simulator = MODS(shuffle_actions)
 
     def read(self, **kwargs):
-        return self.simulator.Read()
+        state, actions, reward = self.simulator.Read()
+        # the original simulator does not remove some HTML tags - remove them all:
+        state = re.sub('<[^>]*>', '', state)
+        return state, actions, reward
 
     def write(self, index):
         """
