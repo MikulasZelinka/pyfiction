@@ -2,3 +2,5 @@
 __pycache__/
 *.glkdata
 *.egg-info/
+pyfiction/agents/savingjohn/logs/
+pyfiction/agents/machineofdeath/logs/

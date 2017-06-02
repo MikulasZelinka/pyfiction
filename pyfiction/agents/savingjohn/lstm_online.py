@@ -34,7 +34,10 @@ agent.create_model(embedding_dimensions=embedding_dimensions,
                    optimizer=optimizer)
 
 # Visualize the model
-plot_model(agent.model, to_file='model.png', show_shapes=True)
+try:
+    plot_model(agent.model, to_file='model.png', show_shapes=True)
+except ImportError as e:
+    print('Couldn\'t print the model image: ', e)
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
 # This example seems to converge to a reward of 19.9X (with 19.94 being the optimal reward)
