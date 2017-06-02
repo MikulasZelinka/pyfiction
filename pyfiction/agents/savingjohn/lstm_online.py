@@ -1,5 +1,6 @@
 import datetime
 import logging
+import os
 
 from keras.optimizers import SGD, RMSprop
 from keras.utils import plot_model
@@ -42,12 +43,13 @@ except ImportError as e:
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
 # This example seems to converge to a reward of 19.9X (with 19.94 being the optimal reward)
 epochs = 128
+os.makedirs('logs', exist_ok=True)
 for i in range(epochs):
     logger.info('Epoch %s', i)
     rewards = agent.train_online(episodes=128, max_steps=100, batch_size=64, gamma=0.95, epsilon=1, reward_scale=20,
                                  epsilon_decay=0.99, prioritized_fraction=0.25, test_steps=4)
-    file_name = 'Epoch' + str(i) + '_' + str(datetime.datetime.now())
-    with open(file_name + '.txt', 'w') as file:
+    file_name = 'Epoch' + str(i) + '_' + datetime.datetime.now().strftime('%m-%d-%H_%M_%S')
+    with open('logs/' + file_name + '.txt', 'w') as file:
         for reward in rewards:
             file.write(str(reward) + '\n')
-    agent.model.save(file_name + '.h5')
+    agent.model.save('logs/' + file_name + '.h5')
