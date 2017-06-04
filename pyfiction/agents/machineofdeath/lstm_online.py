@@ -24,7 +24,6 @@ agent.initialize_tokens(iterations=8092, max_steps=500)
 
 # Create a model with given parameters
 optimizer = RMSprop()  # (lr=0.0005)
-# optimizer = SGD(lr=0.001)
 embedding_dimensions = 32
 lstm_dimensions = 16
 dense_dimensions = 8
@@ -40,14 +39,16 @@ except ImportError as e:
     print('Couldn\'t print the model image: ', e)
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
-epochs = 256
+epochs = 16
 os.makedirs('logs', exist_ok=True)
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    rewards = agent.train_online(episodes=256, max_steps=500, batch_size=64, gamma=0.99, epsilon=1, reward_scale=20,
-                                 epsilon_decay=0.99, prioritized_fraction=0.25, test_steps=8)
+    # rewards = agent.train_online(episodes=256, max_steps=500, batch_size=64, gamma=0.99, epsilon=1,
+    #                              reward_scale=20, epsilon_decay=0.99, prioritized_fraction=0.25, test_steps=8)
+    rewards = agent.train_traces(episodes=1024, max_steps=500, batch_size=64, gamma=0.99, epsilon_decay=0.995,
+                                 test_steps=4, reward_scale=20)
     file_name = 'Epoch' + str(i) + '_' + datetime.datetime.now().strftime('%m-%d-%H_%M_%S')
-    with open(file_name + '.txt', 'w') as file:
+    with open('logs/' + file_name + '.txt', 'w') as file:
         for reward in rewards:
             file.write(str(reward) + '\n')
-    agent.model.save(file_name + '.h5')
+    agent.model.save('logs/' + file_name + '.h5')
