@@ -1,20 +1,22 @@
 import random
 import time
 from pyfiction.agents import agent
-# StoryNode import is needed for unpickling the game file
 from pyfiction.simulators.machineofdeath_simulator import MachineOfDeathSimulator
+from pyfiction.simulators.savingjohn_simulator import SavingJohnSimulator
+# StoryNode import is needed for unpickling the game file:
 from pyfiction.simulators.text_games.simulators.MySimulator import StoryNode
 import numpy as np
 
 
 # This agent randomly searches the action space and remembers the best trace and the best final reward for each state
 # Best trace is a list of all game states and actions resulting in the largest cumulative reward
+# Also finds the best possible cumulative reward for each visited state
 class RandomSearchAgent(agent.Agent):
     def __init__(self):
         random.seed(0)
+
         # we want to find the shortest best solution if possible - use stepCost
-        # MoD simulator already provides step cost
-        self.stepCost = 0
+        self.stepCost = -0.1
         self.bestReward = -np.math.inf
         self.bestTrace = []
 
@@ -33,7 +35,10 @@ class RandomSearchAgent(agent.Agent):
 
     def act(self, state, actions, reward):
 
-        self.totalReward += reward + self.stepCost
+        if reward == 0:
+            reward = self.stepCost
+
+        self.totalReward += reward
 
         action = None
         index = None
@@ -57,6 +62,21 @@ class RandomSearchAgent(agent.Agent):
             print('new best actions: ', [x[3] for x in self.bestTrace])
             print('last state: ', self.trace[-1][0])
 
+        for state, _, _, _ in self.trace:
+            if state in self.states:
+                index = self.states.index(state)
+                self.rewards[index] = max(self.totalReward, self.rewards[index])
+            else:
+                self.states.append(state)
+                self.rewards.append(self.totalReward)
+
+                # self.experience.append(self.trace)
+
+        self.totalReward = 0
+        self.trace = []
+
+
+        # MoD reward and ending checking:
         # check if all endings are annotated
         # ending = self.currentTrace[-1][0].split('THE END')[0]#.split('<html>')[-2]#.split('.')[-2]
         # found = False
@@ -98,27 +118,14 @@ class RandomSearchAgent(agent.Agent):
         #    self.endings.append(ending)
         #    print('endings count: ', len(self.endings))
 
-        for state, _, _, _ in self.trace:
-            if state in self.states:
-                index = self.states.index(state)
-                self.rewards[index] = max(self.totalReward, self.rewards[index])
-            else:
-                self.states.append(state)
-                self.rewards.append(self.totalReward)
-
-                # self.experience.append(self.trace)
-
-        self.totalReward = 0
-        self.trace = []
-
 
 def main():
     agent = RandomSearchAgent()
     start_time = time.time()
-    simulator = MachineOfDeathSimulator()
+    # simulator = MachineOfDeathSimulator()
+    simulator = SavingJohnSimulator()
     num_episode = 0
     episodes = 2 ** 20
-    # episodes = 10000
     while num_episode < episodes:
 
         (text, actions, reward) = simulator.read()

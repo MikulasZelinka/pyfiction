@@ -23,12 +23,16 @@ agent = LSTMAgent(simulator=SavingJohnSimulator)
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens(iterations=1024, max_steps=100)
 
-# Create a model with given parameters
-optimizer = RMSprop()  # (lr=0.0005)
-# optimizer = SGD(lr=0.001)
-embedding_dimensions = 32
-lstm_dimensions = 16
+optimizer = RMSprop()
+
+# embedding_dimensions = 32
+# lstm_dimensions = 16
+# dense_dimensions = 8
+
+embedding_dimensions = 16
+lstm_dimensions = 32
 dense_dimensions = 8
+
 agent.create_model(embedding_dimensions=embedding_dimensions,
                    lstm_dimensions=lstm_dimensions,
                    dense_dimensions=dense_dimensions,
@@ -46,10 +50,10 @@ epochs = 1
 os.makedirs('logs', exist_ok=True)
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    # rewards = agent.train_online(episodes=128, max_steps=100, batch_size=64, gamma=0.95, epsilon=1, reward_scale=20,
-    #                              epsilon_decay=0.99, prioritized_fraction=0.25, test_steps=4)
-    rewards = agent.train_traces(episodes=1024, max_steps=100, batch_size=64, gamma=0.95, epsilon_decay=0.995,
-                                 test_steps=1, reward_scale=20)
+    rewards = agent.train_online(episodes=1024, max_steps=100, batch_size=64, gamma=0.95, epsilon=1, reward_scale=20,
+                                 epsilon_decay=0.99, prioritized_fraction=0.25, test_steps=4)
+    # rewards = agent.train_traces(episodes=1024, max_steps=100, batch_size=64, gamma=0.95, epsilon_decay=0.995,
+    #                              test_steps=1, reward_scale=20)
     file_name = 'Epoch' + str(i) + '_' + datetime.datetime.now().strftime('%m-%d-%H_%M_%S')
     with open('logs/' + file_name + '.txt', 'w') as file:
         for reward in rewards:

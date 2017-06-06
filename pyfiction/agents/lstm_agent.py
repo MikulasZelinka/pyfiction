@@ -86,9 +86,8 @@ class LSTMAgent(agent.Agent):
         self.tokenizer = Tokenizer(num_words=max_words)  # maximum number of unique words to use
 
         # visualization
-        # self.tensorboard = TensorBoard(log_dir='./tensorboard', histogram_freq=10, write_graph=False,
-        #                                embeddings_freq=1,
-        #                                embeddings_layer_names=['embedding_state', 'embedding_action'])
+        self.tensorboard = TensorBoard(log_dir='./logs', write_graph=False, write_images=True,
+                                       embeddings_freq=1, embeddings_metadata='logs/embeddings.tsv')
 
     def act(self, text, actions, epsilon=0):
         """
@@ -182,8 +181,7 @@ class LSTMAgent(agent.Agent):
 
         # Temporarily store all experience and use it to get the tokens
         self.play_game(episodes=iterations, max_steps=max_steps, store_experience=True, store_text=True,
-                       epsilon=1,
-                       verbose=False)
+                       epsilon=1, verbose=False)
 
         state_texts = [x[0] for x in self.experience]
         action_texts = [x[1] for x in self.experience]
@@ -197,6 +195,13 @@ class LSTMAgent(agent.Agent):
         logger.info('Tokenizer after adding states on top of actions: %s words - %s',
                     len(self.tokenizer.word_index.items()),
                     self.tokenizer.word_index)
+
+        # Store the token information in a text file for embedding visualization
+        with open('logs/embeddings.tsv', 'w') as file:
+            # write an empty token for the first null embedding
+            file.write('EMPTY_EMBEDDING_TOKEN\n')
+            for token in list(self.tokenizer.word_index.keys()):
+                file.write(token + '\n')
 
         # Clean text experience data
         self.experience = []
@@ -487,8 +492,14 @@ class LSTMAgent(agent.Agent):
             # logger.debug('actions %s', actions)
             # logger.debug('targets %s', targets)
 
-            self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=0)
-            # callbacks=[self.tensorboard])
+            callbacks = []
+
+            # add a tensorboard callback on the last episode
+            if i + 1 == episodes:
+                callbacks = [self.tensorboard]
+
+            self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1,
+                           callbacks=callbacks)
 
             epsilon *= epsilon_decay
 
@@ -578,8 +589,8 @@ class LSTMAgent(agent.Agent):
             # logger.debug('actions %s', actions)
             # logger.debug('targets %s', targets)
 
-            self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
-            # callbacks=[self.tensorboard])
+            self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1,
+                           callbacks=[self.tensorboard])
 
             epsilon *= epsilon_decay
 
