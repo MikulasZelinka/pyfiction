@@ -61,7 +61,7 @@ def load_embeddings(path):
         embeddings_index[word] = coefficients
     f.close()
 
-    logger.info('GloVe embeddings are using %s word vectors.' % len(embeddings_index))
+    logger.info('Imported embeddings are using %s word vectors.' % len(embeddings_index))
     return embeddings_index
 
 
@@ -81,6 +81,7 @@ class LSTMAgent(agent.Agent):
         self.experience_prioritized = []
         self.unique_endings = []
         self.unique_prioritized_states = []
+        self.state_action_history = None
 
         self.model = None
         self.tokenizer = Tokenizer(num_words=max_words)  # maximum number of unique words to use
@@ -89,19 +90,18 @@ class LSTMAgent(agent.Agent):
         self.tensorboard = TensorBoard(log_dir='./logs', write_graph=False, write_images=True,
                                        embeddings_freq=1, embeddings_metadata='logs/embeddings.tsv')
 
-    def act(self, text, actions, epsilon=0):
+    def act(self, state, actions, epsilon=0):
         """
         returns an action index either randomly or using the model to pick an action with highest Q-value
-        :param text: state text
+        :param state: state text
         :param actions: actions to be considered
         :param epsilon: probability of choosing a random action
         :return: index of the picked action and a Q-value
         """
-        if (epsilon > 0 and 1 > epsilon > random.random()) or epsilon == 1:
+        if epsilon == 1 or (epsilon > 0 and 1 > epsilon > random.random()):
             return random.randint(0, len(actions) - 1), None
 
-        # create sequences from text data
-        state = self.vectorize([text])[0]
+        state = self.vectorize([state])[0]
         actions = self.vectorize(actions)
 
         # return an action with maximum Q value
@@ -197,11 +197,11 @@ class LSTMAgent(agent.Agent):
                     self.tokenizer.word_index)
 
         # Store the token information in a text file for embedding visualization
-        with open('logs/embeddings.tsv', 'w') as file:
+        with open('logs/embeddings.tsv', 'wb') as file:
             # write an empty token for the first null embedding
-            file.write('EMPTY_EMBEDDING_TOKEN\n')
+            file.write(b'EMPTY_EMBEDDING_TOKEN\n')
             for token in list(self.tokenizer.word_index.keys()):
-                file.write(token + '\n')
+                file.write(token.encode('utf-8') + b'\n')
 
         # Clean text experience data
         self.experience = []
@@ -230,7 +230,7 @@ class LSTMAgent(agent.Agent):
     def reset(self):
         self.simulator.restart()
 
-    def play_game(self, max_steps, episodes=1, step_cost=-0.01, store_experience=True, store_text=False, epsilon=1,
+    def play_game(self, max_steps, episodes=1, step_cost=-0.1, store_experience=True, store_text=False, epsilon=1,
                   reward_scale=1, verbose=False):
         """
         Uses the model to play the game.
@@ -251,7 +251,11 @@ class LSTMAgent(agent.Agent):
             steps = 0
             experiences = []
 
+            self.reset_history()
+
             (state, actions, reward) = self.simulator.read()
+            state = preprocess(state)
+            actions = [preprocess(a) for a in actions]
 
             while len(actions) > 0 and steps <= max_steps:
 
@@ -261,12 +265,18 @@ class LSTMAgent(agent.Agent):
                     logger.info('State: %s', state)
                     logger.info('Best action: %s, q=%s', actions[action], q_value)
 
+                # only save to history if tokenizer is already initialized == not storing text data
+                if not store_text:
+                    self.add_to_history(self.vectorize([state])[0], self.vectorize([actions[action]])[0])
+
                 self.simulator.write(action)
 
                 last_state = state
                 last_action = actions[action]
 
                 (state, actions, reward) = self.simulator.read()
+                state = preprocess(state)
+                actions = [preprocess(a) for a in actions]
                 finished = len(actions) < 1
 
                 if steps >= max_steps:
@@ -319,12 +329,7 @@ class LSTMAgent(agent.Agent):
 
         return state_sequence, action_sequence, reward, state_next_sequence, actions_next_sequences, finished
 
-    def store_experience(self, state, action, reward, state_next, actions_next, finished, store_text_only=False):
-
-        state_text = preprocess(state)
-        action_text = preprocess(action)
-        state_next_text = preprocess(state_next)
-        actions_next_texts = [preprocess(a) for a in actions_next]
+    def store_experience(self, state_text, action_text, reward, state_next_text, actions_next_texts, finished, store_text_only=False):
 
         # storing the text version of experience is only necessary prior to fitting the tokenizer
         if store_text_only:
@@ -410,7 +415,7 @@ class LSTMAgent(agent.Agent):
             self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
 
     def train_online(self, max_steps, episodes=1024, batch_size=64, gamma=0.99, epsilon=1, epsilon_decay=0.995,
-                     prioritized_fraction=0, reward_scale=1, step_cost=-0.01, test_steps=1):
+                     prioritized_fraction=0, reward_scale=1, step_cost=-0.1, test_steps=1):
         """
         Trains the model while playing at the same time
         :param reward_scale:
@@ -495,8 +500,8 @@ class LSTMAgent(agent.Agent):
             callbacks = []
 
             # add a tensorboard callback on the last episode
-            if i + 1 == episodes:
-                callbacks = [self.tensorboard]
+            # if i + 1 == episodes:
+            #     callbacks = [self.tensorboard]
 
             self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1,
                            callbacks=callbacks)
@@ -506,7 +511,7 @@ class LSTMAgent(agent.Agent):
         return rewards
 
     def train_traces(self, max_steps, episodes=256, batch_size=64, gamma=0.99, epsilon=1,
-                     epsilon_decay=0.995, reward_scale=1, step_cost=-0.01, test_steps=1):
+                     epsilon_decay=0.995, reward_scale=1, step_cost=-0.1, test_steps=1):
         """
         Trains the model while playing at the same time
         :param reward_scale:
@@ -596,12 +601,40 @@ class LSTMAgent(agent.Agent):
 
         return rewards
 
-    def q(self, state, action):
+    def q(self, state, action, penalize_history=True):
         """
         returns the Q-value of a single (state, action) pair
         :param state:
         :param action:
+        :param penalize_history:
         :return: Q-value estimated by the NN model
         """
 
-        return self.model.predict([state.reshape((1, len(state))), action.reshape((1, len(action)))])[[0]]
+        q = self.model.predict([state.reshape((1, len(state))), action.reshape((1, len(action)))])[[0]]
+        if penalize_history:
+            q -= self.get_history(state, action) / 10
+
+        return q
+
+    def add_to_history(self, state, action):
+
+        state = tuple(np.trim_zeros(state, 'f'))
+        action = tuple(np.trim_zeros(action, 'f'))
+
+        if (state, action) in self.state_action_history:
+            self.state_action_history[(state, action)] += 1
+        else:
+            self.state_action_history[(state, action)] = 1
+
+    def get_history(self, state, action):
+
+        state = tuple(np.trim_zeros(state, 'f'))
+        action = tuple(np.trim_zeros(action, 'f'))
+
+        if (state, action) in self.state_action_history:
+            return self.state_action_history[(state, action)]
+        return 0
+
+    def reset_history(self):
+        self.state_action_history = {}
+
