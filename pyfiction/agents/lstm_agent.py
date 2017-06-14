@@ -277,6 +277,9 @@ class LSTMAgent(agent.Agent):
                 (state, actions, reward) = self.simulator.read()
                 state = preprocess(state)
                 actions = [preprocess(a) for a in actions]
+                # if not store_text:
+                #     print(actions)
+                #     print(self.vectorize(actions))
                 finished = len(actions) < 1
 
                 if steps >= max_steps:
@@ -612,7 +615,8 @@ class LSTMAgent(agent.Agent):
 
         q = self.model.predict([state.reshape((1, len(state))), action.reshape((1, len(action)))])[[0]]
         if penalize_history:
-            q -= self.get_history(state, action) / 10
+            # q is in <0, 1>:
+            q = q ** (self.get_history(state, action) + 1)
 
         return q
 

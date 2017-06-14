@@ -17,8 +17,8 @@ class MachineOfDeathSimulator(Simulator):
     def restart(self):
         self.simulator.Restart()
 
-    def __init__(self, shuffle_actions=True):
-        self.simulator = MODS(shuffle_actions)
+    def __init__(self, shuffle_actions=True, paraphrase_actions=False):
+        self.simulator = MODS(shuffle_actions, doParaphrase=paraphrase_actions)
 
     def read(self, **kwargs):
         state, actions, reward = self.simulator.Read()

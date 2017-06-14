@@ -25,10 +25,6 @@ agent.initialize_tokens(iterations=1024, max_steps=100)
 
 optimizer = RMSprop()
 
-# embedding_dimensions = 32
-# lstm_dimensions = 16
-# dense_dimensions = 8
-
 embedding_dimensions = 16
 lstm_dimensions = 32
 dense_dimensions = 8
