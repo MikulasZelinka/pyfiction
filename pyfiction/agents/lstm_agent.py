@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-def preprocess(text, chars='', expand=False):
+def preprocess(text, chars='', expand=True):
     """
     function that removes whitespaces, converts to lowercase, etc.
     :param expand: expand 'll, 'm and similar expressions to reduce the number of different tokens
@@ -46,7 +46,8 @@ def preprocess(text, chars='', expand=False):
             replace('won\'t', 'will not'). \
             replace('n\'t', ' not'). \
             replace('\'ll ', ' will '). \
-            replace('\'ve ', ' have ')
+            replace('\'ve ', ' have '). \
+            replace('\'s', ' \'s')
 
     return text
 
@@ -96,7 +97,7 @@ class LSTMAgent(agent.Agent):
         :param state: state text
         :param actions: actions to be considered
         :param epsilon: probability of choosing a random action
-        :return: index of the picked action and a Q-value
+        :return: index of the picked action and a Q-value (None if random)
         """
         if epsilon == 1 or (epsilon > 0 and 1 > epsilon > random.random()):
             return random.randint(0, len(actions) - 1), None
@@ -332,7 +333,8 @@ class LSTMAgent(agent.Agent):
 
         return state_sequence, action_sequence, reward, state_next_sequence, actions_next_sequences, finished
 
-    def store_experience(self, state_text, action_text, reward, state_next_text, actions_next_texts, finished, store_text_only=False):
+    def store_experience(self, state_text, action_text, reward, state_next_text, actions_next_texts, finished,
+                         store_text_only=False):
 
         # storing the text version of experience is only necessary prior to fitting the tokenizer
         if store_text_only:
@@ -417,7 +419,7 @@ class LSTMAgent(agent.Agent):
 
             self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
 
-    def train_online(self, max_steps, episodes=1024, batch_size=64, gamma=0.99, epsilon=1, epsilon_decay=0.995,
+    def train_online(self, max_steps, episodes=256, batch_size=256, gamma=0.99, epsilon=1, epsilon_decay=0.995,
                      prioritized_fraction=0, reward_scale=1, step_cost=-0.1, test_steps=1):
         """
         Trains the model while playing at the same time
@@ -641,4 +643,3 @@ class LSTMAgent(agent.Agent):
 
     def reset_history(self):
         self.state_action_history = {}
-
