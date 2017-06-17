@@ -2,6 +2,7 @@ import logging
 import os
 import random
 
+import datetime
 import numpy as np
 from keras import Input
 from keras.callbacks import TensorBoard
@@ -420,9 +421,10 @@ class LSTMAgent(agent.Agent):
             self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
 
     def train_online(self, max_steps, episodes=256, batch_size=256, gamma=0.99, epsilon=1, epsilon_decay=0.995,
-                     prioritized_fraction=0, reward_scale=1, step_cost=-0.1, test_steps=1):
+                     prioritized_fraction=0, reward_scale=1, step_cost=-0.1, test_steps=1, checkpoint_steps=64):
         """
         Trains the model while playing at the same time
+        :param checkpoint_steps:
         :param reward_scale:
         :param test_steps: test the agent after each N steps (batches)
         :param epsilon_decay: 
@@ -442,17 +444,17 @@ class LSTMAgent(agent.Agent):
         batch = batch_size - batch_prioritized
 
         for i in range(episodes):
-            reward = self.play_game(max_steps=max_steps, episodes=4, step_cost=step_cost, store_experience=True,
+            reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=True,
                                     epsilon=epsilon, reward_scale=reward_scale)
 
-            logger.info('Episode %s, epsilon = %s, average reward: %s', i, epsilon, reward)
+            logger.info('Episode {}, epsilon = {:.4f}, average reward: {:.1f}'.format(i, epsilon, reward))
 
             # Test the agent after each N batches of weight updates
             if ((i + 1) % test_steps) == 0:
                 reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=False,
                                         epsilon=0, reward_scale=reward_scale)
                 rewards.append(reward)
-                logger.info('Test reward: %s', reward)
+                logger.info('Test reward: {:.1f}'.format(reward))
 
             if len(self.experience) < 1:
                 return
@@ -512,6 +514,14 @@ class LSTMAgent(agent.Agent):
                            callbacks=callbacks)
 
             epsilon *= epsilon_decay
+
+            if ((i + 1) % checkpoint_steps) == 0:
+
+                file_name = 'Ep' + str(i) + '_' + datetime.datetime.now().strftime('%m-%d-%H_%M_%S')
+                with open('logs/' + file_name + '.txt', 'w') as file:
+                    for reward in rewards:
+                        file.write(str(reward) + '\n')
+                self.model.save('logs/' + file_name + '.h5')
 
         return rewards
 

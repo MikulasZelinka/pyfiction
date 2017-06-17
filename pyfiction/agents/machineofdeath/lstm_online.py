@@ -38,23 +38,16 @@ agent.create_model(embedding_dimensions=embedding_dimensions,
 try:
     plot_model(agent.model, to_file='model.png', show_shapes=True)
 except ImportError as e:
-    print('Couldn\'t print the model image: ', e)
+    logger.warning("Couldn't print the model image: {}".format(e))
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
 # This example seems to converge to two nearly optimal rewards in two out of three game branches
-epochs = 16
+epochs = 1
 os.makedirs('logs', exist_ok=True)
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    rewards = agent.train_online(episodes=1024, max_steps=500, batch_size=256, gamma=0.95, epsilon=1, reward_scale=30,
-                                 epsilon_decay=0.99, prioritized_fraction=0.25, test_steps=4)
-    # rewards = agent.train_traces(episodes=1024, max_steps=500, batch_size=512, gamma=0.99, epsilon_decay=0.995,
-    #                              test_steps=4, reward_scale=20)
-    file_name = 'Epoch' + str(i) + '_' + datetime.datetime.now().strftime('%m-%d-%H_%M_%S')
-    with open('logs/' + file_name + '.txt', 'w') as file:
-        for reward in rewards:
-            file.write(str(reward) + '\n')
-    agent.model.save('logs/' + file_name + '.h5')
+    rewards = agent.train_online(episodes=256 * 256, max_steps=500, batch_size=256, gamma=0.99, epsilon=1,
+                                 reward_scale=30, epsilon_decay=0.99, prioritized_fraction=0.25, test_steps=4)
 
 # Test on paraphrased actions
 # agent.simulator = MachineOfDeathSimulator(paraphrase_actions=True)
@@ -62,7 +55,7 @@ for i in range(epochs):
 # episodes = 256
 # for i in range(episodes):
 #     logger.info('Final reward: %s',
-#                 agent.play_game(max_steps=500, episodes=1, verbose=False, store_experience=False, epsilon=0))
+#                 agent.play_game(max_steps=500, episodes=8, verbose=False, store_experience=False, epsilon=0))
 
 # for i in range(episodes):
 #     logger.info('Train reward: %s',
