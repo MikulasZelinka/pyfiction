@@ -86,6 +86,13 @@ class LSTMAgent(agent.Agent):
         self.state_action_history = None
 
         self.model = None
+
+        # subsets of the model used for partial forward passes:
+        # model = model_dot_state_action(model_state, model_action)
+        self.model_state = None
+        self.model_action = None
+        self.model_dot_state_action = None
+
         self.tokenizer = Tokenizer(num_words=max_words)  # maximum number of unique words to use
 
         # visualization
@@ -107,17 +114,7 @@ class LSTMAgent(agent.Agent):
         actions = self.vectorize(actions)
 
         # return an action with maximum Q value
-        q_max = -np.math.inf
-        best_action = 0
-        # logger.debug('q for state %s', state)
-        for i in range(len(actions)):
-            q = self.q(state, actions[i])
-            # logger.debug('q for action "%s" is %s', actions[i], q)
-            if q > q_max:
-                q_max = q
-                best_action = i
-
-        return best_action, q_max
+        return self.q_precomputed_state(state, actions)
 
     def create_model(self, embedding_dimensions, lstm_dimensions, dense_dimensions, optimizer, embeddings=None,
                      embeddings_trainable=True):
@@ -135,7 +132,7 @@ class LSTMAgent(agent.Agent):
 
         if embeddings is None:
             embedding_shared = Embedding(num_words + 1, embedding_dimensions, input_length=None, mask_zero=True,
-                                         trainable=embeddings_trainable)
+                                         trainable=embeddings_trainable, name="embedding_shared")
         else:
             logger.info('Importing pre-trained word embeddings.')
             embeddings_index = load_embeddings(embeddings)
@@ -152,24 +149,39 @@ class LSTMAgent(agent.Agent):
                     logger.warning('Word not found in embeddings: %s', word)
 
                     embedding_shared = Embedding(num_words + 1, embedding_dimensions, input_length=None, mask_zero=True,
-                                                 trainable=embeddings_trainable, weights=[embedding_matrix])
+                                                 trainable=embeddings_trainable, weights=[embedding_matrix],
+                                                 name="embedding_shared")
 
-        input_state = Input(batch_shape=(None, None))
-        input_action = Input(batch_shape=(None, None))
+        input_state = Input(batch_shape=(None, None), name="input_state")
+        input_action = Input(batch_shape=(None, None), name="input_action")
 
         embedding_state = embedding_shared(input_state)
         embedding_action = embedding_shared(input_action)
 
-        lstm_shared = LSTM(lstm_dimensions)
+        lstm_shared = LSTM(lstm_dimensions, name="lstm_shared")
         lstm_state = lstm_shared(embedding_state)
         lstm_action = lstm_shared(embedding_action)
 
-        dense_state = Dense(dense_dimensions, activation='tanh')(lstm_state)
-        dense_action = Dense(dense_dimensions, activation='tanh')(lstm_action)
+        dense_state = Dense(dense_dimensions, activation='tanh', name="dense_state")(lstm_state)
+        dense_action = Dense(dense_dimensions, activation='tanh', name="dense_action")(lstm_action)
 
-        dot_state_action = Dot(axes=-1, normalize=True)([dense_state, dense_action])
+        model_state = Model(inputs=input_state, outputs=dense_state, name="state")
+        model_action = Model(inputs=input_action, outputs=dense_action, name="action")
 
-        model = Model(inputs=[input_state, input_action], outputs=dot_state_action)
+        self.model_state = model_state
+        self.model_action = model_action
+
+        input_dot_state = Input(shape=(dense_dimensions,))
+        input_dot_action = Input(shape=(dense_dimensions,))
+        dot_state_action = Dot(axes=-1, normalize=True, name="dot_state_action")([input_dot_state, input_dot_action])
+
+        model_dot_state_action = Model(inputs=[input_dot_state, input_dot_action], outputs=dot_state_action,
+                                       name="dot_state_action")
+        self.model_dot_state_action = model_dot_state_action
+
+        model = Model(inputs=[model_state.input, model_action.input],
+                      outputs=model_dot_state_action([model_state.output, model_action.output]),
+                      name="model")
         model.compile(optimizer=optimizer, loss='mse')
 
         self.model = model
@@ -180,6 +192,8 @@ class LSTMAgent(agent.Agent):
         print('---------------')
 
     def initialize_tokens(self, iterations, max_steps):
+
+        logger.info('Initializing tokens by playing the game randomly %s times.', iterations)
 
         # Temporarily store all experience and use it to get the tokens
         self.play_game(episodes=iterations, max_steps=max_steps, store_experience=True, store_text=True,
@@ -204,6 +218,8 @@ class LSTMAgent(agent.Agent):
             file.write(b'EMPTY_EMBEDDING_TOKEN\n')
             for token in list(self.tokenizer.word_index.keys()):
                 file.write(token.encode('utf-8') + b'\n')
+            file.close()
+            logger.info('Saved the embedding dictionary to logs/embeddings.tsv')
 
         # Clean text experience data
         self.experience = []
@@ -302,7 +318,7 @@ class LSTMAgent(agent.Agent):
                 total_reward += reward
                 steps += 1
 
-            # TODO - store only finished?
+            # store only episodes that did not exceed max steps
             if store_experience and steps < max_steps:
                 for last_state, last_action, reward, state, actions, finished in experiences:
                     self.store_experience(last_state, last_action, reward, state, actions, finished, store_text)
@@ -485,11 +501,8 @@ class LSTMAgent(agent.Agent):
 
                 if not finished:
                     # get an action with maximum Q value
-                    q_max = -np.math.inf
-                    for action_next in actions_next:
-                        q = self.q(state_next, action_next)
-                        if q > q_max:
-                            q_max = q
+                    _, q_max = self.q_precomputed_state(state_next, actions_next)
+                    # TODO - isn't this wrong given q_max is in [0,1]?
                     target += gamma * q_max
 
                 states[b] = state
@@ -619,8 +632,8 @@ class LSTMAgent(agent.Agent):
     def q(self, state, action, penalize_history=True):
         """
         returns the Q-value of a single (state, action) pair
-        :param state:
-        :param action:
+        :param state: state text data (embedding index)
+        :param action: action text data (embedding index)
         :param penalize_history:
         :return: Q-value estimated by the NN model
         """
@@ -631,6 +644,42 @@ class LSTMAgent(agent.Agent):
             q = q ** (self.get_history(state, action) + 1)
 
         return q
+
+    def q_precomputed_state(self, state, actions, penalize_history=True):
+        """
+        returns the Q-value of a single (state, action) pair
+        :param state: state text data (embedding index)
+        :param actions: actions text data (embedding index)
+        :param penalize_history:
+        :return: (best action index, best action Q-value estimated by the NN model)
+        """
+
+        state = self.model_state.predict([state.reshape((1, len(state)))])[0]
+
+        # print('state' + str(state))
+
+        q_max = -np.math.inf
+        best_action = 0
+
+        # logger.debug('q for state %s', state)
+        for i in range(len(actions)):
+            action = actions[i]
+            action = self.model_action.predict([action.reshape((1, len(action)))])[0]
+            # print('action' + str(action))
+            q = self.model_dot_state_action.predict(
+                [state.reshape((1, len(state))), action.reshape((1, len(action)))])[0][0]
+            # print('q' + str(q))
+            # logger.debug('q for action "%s" is %s', actions[i], q)
+
+            if penalize_history:
+                # q is in <0, 1>:
+                q = q ** (self.get_history(state, action) + 1)
+
+            if q > q_max:
+                q_max = q
+                best_action = i
+
+        return best_action, q
 
     def add_to_history(self, state, action):
 

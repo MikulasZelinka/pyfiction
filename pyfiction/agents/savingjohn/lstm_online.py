@@ -17,6 +17,8 @@ An example agent for Saving John that uses online learning and prioritized sampl
 This agent class is universal and it should be possible to apply it to different games in the same way
 """
 
+os.makedirs('logs', exist_ok=True)
+
 # Create the agent and specify maximum lengths of descriptions (in words)
 agent = LSTMAgent(simulator=SavingJohnSimulator)
 
@@ -43,7 +45,6 @@ except ImportError as e:
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
 # This example seems to converge to a reward of 19.X (with 19.4 being the optimal reward)
 epochs = 1
-os.makedirs('logs', exist_ok=True)
 for i in range(epochs):
     logger.info('Epoch %s', i)
     rewards = agent.train_online(episodes=1024, max_steps=100, batch_size=256, gamma=0.95, epsilon=1, reward_scale=20,

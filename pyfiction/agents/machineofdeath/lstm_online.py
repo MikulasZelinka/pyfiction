@@ -17,11 +17,13 @@ An example agent for Machine of Death that uses online learning and prioritized 
 This agent class is universal and it should be possible to apply it to different games in the same way
 """
 
+os.makedirs('logs', exist_ok=True)
+
 # Create the agent and specify maximum lengths of descriptions (in words)
 agent = LSTMAgent(simulator=MachineOfDeathSimulator)
 
 # Learn the vocabulary (the function samples the game using a random policy)
-agent.initialize_tokens(iterations=8092, max_steps=500)
+agent.initialize_tokens(iterations=8192, max_steps=500)
 
 optimizer = RMSprop(lr=0.0005)
 
@@ -41,9 +43,9 @@ except ImportError as e:
     logger.warning("Couldn't print the model image: {}".format(e))
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
-# This example seems to converge to two nearly optimal rewards in two out of three game branches
+# This example seems to converge to nearly optimal rewards in two out of three game branches
 epochs = 1
-os.makedirs('logs', exist_ok=True)
+
 for i in range(epochs):
     logger.info('Epoch %s', i)
     rewards = agent.train_online(episodes=256 * 256, max_steps=500, batch_size=256, gamma=0.99, epsilon=1,
