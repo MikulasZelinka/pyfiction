@@ -70,7 +70,18 @@ def load_embeddings(path):
 class LSTMAgent(agent.Agent):
     """
     Basic Q-learning agent that uses LSTMs on top of word embeddings to estimate Q-values of perceived
-     state and action pairs to learn to act optimally
+        state and action pairs to learn to act optimally.
+
+    Architecture of the q(s, a) NN estimator:
+        Embedding(state), Embedding(action) - LSTM(s), LSTM(a) - Dense(s), Dense(a) - Dot(s, a)
+
+    Features:
+        - Embedding and LSTM layers are shared between states and actions
+        - supports loading pre-trained word embeddings (such as GloVe or word2vec)
+        - experience-replay with prioritized sampling (experiences with positive rewards are prioritized)
+        - uses intrinsic motivation in the form of penalizing q(s, a) if 'a' was already chosen in 's'
+
+    This agent class is universal and it should be possible to apply it to different games in the same way
     """
 
     def __init__(self, simulator, max_words=8192):
@@ -82,7 +93,7 @@ class LSTMAgent(agent.Agent):
         self.experience = []
         self.experience_prioritized = []
         self.unique_endings = []
-        self.unique_prioritized_states = []
+        self.unique_prioritized = []
         self.state_action_history = None
 
         self.model = None
@@ -94,6 +105,8 @@ class LSTMAgent(agent.Agent):
         self.model_dot_state_action = None
 
         self.tokenizer = Tokenizer(num_words=max_words)  # maximum number of unique words to use
+
+        os.makedirs('logs', exist_ok=True)
 
         # visualization
         self.tensorboard = TensorBoard(log_dir='./logs', write_graph=False, write_images=True,
@@ -114,7 +127,7 @@ class LSTMAgent(agent.Agent):
         actions = self.vectorize(actions)
 
         # return an action with maximum Q value
-        return self.q_precomputed_state(state, actions)
+        return self.q_precomputed_state(state, actions, penalize_history=True)
 
     def create_model(self, embedding_dimensions, lstm_dimensions, dense_dimensions, optimizer, embeddings=None,
                      embeddings_trainable=True):
@@ -301,7 +314,7 @@ class LSTMAgent(agent.Agent):
                 finished = len(actions) < 1
 
                 if steps >= max_steps:
-                    logger.info('Maximum number of steps exceeded, last state: %s', state)
+                    logger.info('Maximum number of steps exceeded, last state: %s...', state[:64])
                     # TODO - penalize?
                     # reward -= 100
 
@@ -372,18 +385,18 @@ class LSTMAgent(agent.Agent):
 
         if finished and exp_list not in self.unique_endings:
             self.unique_endings.append(exp_list)
-            logger.info('New unique final experience - total %s.\nReward: %s, text: %s',
+            logger.info('New unique final experience - total %s.\nReward: %s, state: %s...',
                         len(self.unique_endings),
                         reward,
-                        state_next_text)
+                        state_next_text[:64])
 
         # TODO - prioritize unique positive AND unique cycled/not finished/extremely negative?
-        if reward >= 0 and exp_list not in self.unique_prioritized_states:
-            self.unique_prioritized_states.append(exp_list)
-            logger.info('New unique positive experience - total %s.\nReward: %s, text: %s',
-                        len(self.unique_prioritized_states),
+        if reward >= 0 and exp_list not in self.unique_prioritized:
+            self.unique_prioritized.append(exp_list)
+            logger.info('New unique positive experience - total %s.\nReward: %s, state: %s...',
+                        len(self.unique_prioritized),
                         reward,
-                        state_next_text)
+                        state_next_text[:64])
             self.experience_prioritized.append(experience)
 
     def train_offline(self, episodes=1, batch_size=32, gamma=0.99, prioritized=False):
@@ -436,7 +449,7 @@ class LSTMAgent(agent.Agent):
 
             self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
 
-    def train_online(self, max_steps, episodes=256, batch_size=256, gamma=0.99, epsilon=1, epsilon_decay=0.995,
+    def train_online(self, max_steps, episodes=256, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.995,
                      prioritized_fraction=0, reward_scale=1, step_cost=-0.1, test_steps=1, checkpoint_steps=64):
         """
         Trains the model while playing at the same time
@@ -456,14 +469,19 @@ class LSTMAgent(agent.Agent):
 
         rewards = []
 
+        # batch_prioritized is the number of prioritized samples to get
         batch_prioritized = int(batch_size * prioritized_fraction)
+        # batch is the number of any samples to get
         batch = batch_size - batch_prioritized
 
         for i in range(episodes):
+
+            # Let the agent sample and store game data with the given epsilon (usually decreasing over time)
             reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=True,
                                     epsilon=epsilon, reward_scale=reward_scale)
 
-            logger.info('Episode {}, epsilon = {:.4f}, average reward: {:.1f}'.format(i, epsilon, reward))
+            logger.info('Episode {}, epsilon = {:.4f}'.format(i, epsilon))
+            logger.info('Train reward: {:.1f}'.format(reward))
 
             # Test the agent after each N batches of weight updates
             if ((i + 1) % test_steps) == 0:
@@ -488,11 +506,14 @@ class LSTMAgent(agent.Agent):
 
             for b in range(batch_size):
 
+                # non-prioritized data:
                 if b < batch:
                     state, action, reward, state_next, actions_next, finished = self.experience[batches[b]]
+                # prioritized data (if there are any)
                 elif len(self.experience_prioritized) > 0:
                     state, action, reward, state_next, actions_next, finished = self.experience_prioritized[
                         batches_prioritized[b - batch]]
+                # get non-prioritized if there are no prioritized
                 else:
                     state, action, reward, state_next, actions_next, finished = self.experience[
                         batches_prioritized[b - batch]]
@@ -502,7 +523,7 @@ class LSTMAgent(agent.Agent):
                 if not finished:
                     # get an action with maximum Q value
                     _, q_max = self.q_precomputed_state(state_next, actions_next)
-                    # TODO - isn't this wrong given q_max is in [0,1]?
+                    # TODO - isn't this wrong given q_max is in [-1,1]?
                     target += gamma * q_max
 
                 states[b] = state
@@ -523,7 +544,8 @@ class LSTMAgent(agent.Agent):
             # if i + 1 == episodes:
             #     callbacks = [self.tensorboard]
 
-            self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1,
+            # TODO - more epochs = higher efficiency
+            self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=16, verbose=1,
                            callbacks=callbacks)
 
             epsilon *= epsilon_decay
@@ -629,23 +651,7 @@ class LSTMAgent(agent.Agent):
 
         return rewards
 
-    def q(self, state, action, penalize_history=True):
-        """
-        returns the Q-value of a single (state, action) pair
-        :param state: state text data (embedding index)
-        :param action: action text data (embedding index)
-        :param penalize_history:
-        :return: Q-value estimated by the NN model
-        """
-
-        q = self.model.predict([state.reshape((1, len(state))), action.reshape((1, len(action)))])[[0]]
-        if penalize_history:
-            # q is in <0, 1>:
-            q = q ** (self.get_history(state, action) + 1)
-
-        return q
-
-    def q_precomputed_state(self, state, actions, penalize_history=True):
+    def q_precomputed_state(self, state, actions, penalize_history=False):
         """
         returns the Q-value of a single (state, action) pair
         :param state: state text data (embedding index)
@@ -654,32 +660,36 @@ class LSTMAgent(agent.Agent):
         :return: (best action index, best action Q-value estimated by the NN model)
         """
 
-        state = self.model_state.predict([state.reshape((1, len(state)))])[0]
-
-        # print('state' + str(state))
+        state_dense = self.model_state.predict([state.reshape((1, len(state)))])[0]
 
         q_max = -np.math.inf
         best_action = 0
 
         # logger.debug('q for state %s', state)
         for i in range(len(actions)):
+
             action = actions[i]
-            action = self.model_action.predict([action.reshape((1, len(action)))])[0]
-            # print('action' + str(action))
+            action_dense = self.model_action.predict([action.reshape((1, len(action)))])[0]
+
             q = self.model_dot_state_action.predict(
-                [state.reshape((1, len(state))), action.reshape((1, len(action)))])[0][0]
-            # print('q' + str(q))
-            # logger.debug('q for action "%s" is %s', actions[i], q)
+                [state_dense.reshape((1, len(state_dense))), action_dense.reshape((1, len(action_dense)))])[0][0]
+
+            # logger.debug('q for action "%s" is %s', action, q)
 
             if penalize_history:
-                # q is in <0, 1>:
-                q = q ** (self.get_history(state, action) + 1)
+                # q is in <-1, 1>:
+                # history = (self.get_history(state, action) + 1)
+                # if history > 2:
+                #     print(history, ' ', q)
+                # q -= 0.01 * history
+                # q = q ** (self.get_history(state, action) + 1)
+                q = q
 
             if q > q_max:
                 q_max = q
                 best_action = i
 
-        return best_action, q
+        return best_action, q_max
 
     def add_to_history(self, state, action):
 

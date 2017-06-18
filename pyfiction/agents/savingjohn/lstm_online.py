@@ -14,10 +14,7 @@ logger = logging.getLogger(__name__)
 
 """
 An example agent for Saving John that uses online learning and prioritized sampling
-This agent class is universal and it should be possible to apply it to different games in the same way
 """
-
-os.makedirs('logs', exist_ok=True)
 
 # Create the agent and specify maximum lengths of descriptions (in words)
 agent = LSTMAgent(simulator=SavingJohnSimulator)
