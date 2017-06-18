@@ -22,7 +22,7 @@ agent = LSTMAgent(simulator=MachineOfDeathSimulator)
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens(iterations=8192, max_steps=500)
 
-optimizer = RMSprop(lr=0.0001)
+optimizer = RMSprop(lr=0.0005)
 
 embedding_dimensions = 16
 lstm_dimensions = 16
@@ -45,8 +45,8 @@ epochs = 1
 
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    rewards = agent.train_online(episodes=256 * 256, max_steps=500, batch_size=256, gamma=0.95, epsilon=1,
-                                 epsilon_decay=0.995, reward_scale=30, prioritized_fraction=0.25, test_steps=1)
+    rewards = agent.train_online(episodes=256*256, max_steps=500, batch_size=256, gamma=0.95, epsilon=1,
+                                 epsilon_decay=0.99, reward_scale=30, prioritized_fraction=0.25, test_steps=4)
 
 # Test on paraphrased actions
 # agent.simulator = MachineOfDeathSimulator(paraphrase_actions=True)

@@ -15,7 +15,7 @@ from keras.layers import LSTM, Dense, Embedding, Dot
 
 from pyfiction.agents import agent
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -401,57 +401,57 @@ class LSTMAgent(agent.Agent):
 
             self.experience_prioritized.append(experience)
 
-    def train_offline(self, episodes=1, batch_size=32, gamma=0.99, prioritized=False):
-        """
-        Picks random experiences and trains the model on them
-        :param episodes: number of episodes, in each episode we train batch_size examples
-        :param batch_size: number of experiences to be used for training (each is used once in an episode)
-        :param gamma: discount factor (higher gamma ~ taking future into account more)
-        :param prioritized: only sample prioritized experiences (final states with usually higher reward values)
-        :return: 
-        """
+    # def train_offline(self, episodes=1, batch_size=32, gamma=0.99, prioritized=False):
+    #     """
+    #     Picks random experiences and trains the model on them
+    #     :param episodes: number of episodes, in each episode we train batch_size examples
+    #     :param batch_size: number of experiences to be used for training (each is used once in an episode)
+    #     :param gamma: discount factor (higher gamma ~ taking future into account more)
+    #     :param prioritized: only sample prioritized experiences (final states with usually higher reward values)
+    #     :return:
+    #     """
+    #
+    #     source = self.experience
+    #
+    #     if prioritized:
+    #         source = self.experience_prioritized
+    #         logger.debug('Sampling prioritized only, %s from %s', batch_size, len(source))
+    #
+    #     if len(source) < 1:
+    #         logger.warning('No samples for training available.')
+    #         return
+    #
+    #     for x in range(episodes):
+    #
+    #         batches = np.random.choice(len(source), batch_size)
+    #
+    #         states = [None] * batch_size
+    #         actions = [None] * batch_size
+    #         targets = np.zeros((batch_size, 1))
+    #
+    #         for i in range(batch_size):
+    #             state, action, reward, state_next, actions_next, finished = source[batches[i]]
+    #             target = reward
+    #
+    #             if not finished:
+    #                 # get an action with maximum Q value
+    #                 q_max = -np.math.inf
+    #                 for action_next in actions_next:
+    #                     q = self.q(state_next, action_next)
+    #                     if q > q_max:
+    #                         q_max = q
+    #                 target += gamma * q_max
+    #
+    #             states[i] = state
+    #             actions[i] = action
+    #             targets[i] = target
+    #
+    #         states = pad_sequences(states)
+    #         actions = pad_sequences(actions)
+    #
+    #         self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
 
-        source = self.experience
-
-        if prioritized:
-            source = self.experience_prioritized
-            logger.debug('Sampling prioritized only, %s from %s', batch_size, len(source))
-
-        if len(source) < 1:
-            logger.warning('No samples for training available.')
-            return
-
-        for x in range(episodes):
-
-            batches = np.random.choice(len(source), batch_size)
-
-            states = [None] * batch_size
-            actions = [None] * batch_size
-            targets = np.zeros((batch_size, 1))
-
-            for i in range(batch_size):
-                state, action, reward, state_next, actions_next, finished = source[batches[i]]
-                target = reward
-
-                if not finished:
-                    # get an action with maximum Q value
-                    q_max = -np.math.inf
-                    for action_next in actions_next:
-                        q = self.q(state_next, action_next)
-                        if q > q_max:
-                            q_max = q
-                    target += gamma * q_max
-
-                states[i] = state
-                actions[i] = action
-                targets[i] = target
-
-            states = pad_sequences(states)
-            actions = pad_sequences(actions)
-
-            self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
-
-    def train_online(self, max_steps, episodes=256, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.995,
+    def train_online(self, max_steps, episodes=256, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.99,
                      prioritized_fraction=0, reward_scale=1, step_cost=-0.1, test_steps=1, checkpoint_steps=64):
         """
         Trains the model while playing at the same time
@@ -479,7 +479,7 @@ class LSTMAgent(agent.Agent):
         for i in range(episodes):
 
             # Let the agent sample and store game data with the given epsilon (usually decreasing over time)
-            reward = self.play_game(max_steps=max_steps, episodes=4, step_cost=step_cost, store_experience=True,
+            reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=True,
                                     epsilon=epsilon, reward_scale=reward_scale)
 
             logger.info('\n------------------------------------------\nEpisode {}, epsilon = {:.4f}'.format(i, epsilon))
@@ -524,8 +524,7 @@ class LSTMAgent(agent.Agent):
 
                 if not finished:
                     # get an action with maximum Q value
-                    _, q_max = self.q_precomputed_state(state_next, actions_next)
-                    # TODO - isn't this wrong given q_max is in [-1,1]?
+                    _, q_max = self.q_precomputed_state(state_next, actions_next, penalize_history=True)
                     target += gamma * q_max
 
                 states[b] = state
@@ -536,15 +535,15 @@ class LSTMAgent(agent.Agent):
             states = pad_sequences(states)
             actions = pad_sequences(actions)
 
-            # logger.debug('states %s', states)
-            # logger.debug('actions %s', actions)
-            # logger.debug('targets %s', targets)
+            logger.debug('states %s', states)
+            logger.debug('actions %s', actions)
+            logger.debug('targets %s', targets)
 
             callbacks = []
 
             # add a tensorboard callback on the last episode
-            # if i + 1 == episodes:
-            #     callbacks = [self.tensorboard]
+            if i + 1 == episodes:
+                callbacks = [self.tensorboard]
 
             self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=0,
                            callbacks=callbacks)
@@ -561,103 +560,103 @@ class LSTMAgent(agent.Agent):
 
         return rewards
 
-    def train_traces(self, max_steps, episodes=256, batch_size=64, gamma=0.99, epsilon=1,
-                     epsilon_decay=0.995, reward_scale=1, step_cost=-0.1, test_steps=1):
-        """
-        Trains the model while playing at the same time
-        :param reward_scale:
-        :param test_steps: test the agent after each N steps (batches)
-        :param epsilon_decay:
-        :param epsilon:
-        :param step_cost:
-        :param episodes:
-        :param max_steps:
-        :param batch_size: number of experiences to be used for training (each is used once)
-        :param gamma:
-        :return: rewards
-        """
-
-        rewards = []
-
-        for i in range(episodes):
-
-            # clear the experience buffer
-            self.experience = []
-
-            # save one trace into the buffer
-            reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=True,
-                                    epsilon=epsilon, reward_scale=reward_scale)
-
-            logger.info('Episode %s, epsilon = %s, Train reward: %s', i, epsilon, reward)
-
-            # Test the agent after each N batches of weight updates
-            if i == 0 or ((i + 1) % test_steps) == 0:
-                reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=False,
-                                        epsilon=0, reward_scale=reward_scale)
-                rewards.append(reward)
-                logger.info('Test reward: %s', reward)
-
-            last_trace = self.experience
-
-            trace_length = len(last_trace)
-            if trace_length < 1:
-                logger.warning('No trace available or empty trace sampled, skipping episode %s', i)
-                continue
-
-            states = [None] * trace_length
-            actions = [None] * trace_length
-            targets = np.zeros((trace_length, 1))
-
-            final_reward = None
-
-            j = 0
-            reward_decay = 1
-            for state, action, reward, _, _, _ in reversed(last_trace):
-                if not final_reward:
-                    final_reward = reward
-                    target = reward
-                else:
-                    # TODO - adaptive scaling?
-                    # TODO target = reward + final_reward * reward_decay (* epsilon)? or combine with a q-step
-                    target = reward + final_reward * reward_decay
-
-                # if not finished:
-                # get an action with maximum Q value
-                # q_max = -np.math.inf
-                # for action_next in actions_next:
-                #     q = self.q(state_next, action_next)
-                #     if q > q_max:
-                #         q_max = q
-                # target += gamma * q_max
-
-                states[j] = state
-                actions[j] = action
-                targets[j] = target
-
-                reward_decay *= gamma
-                j += 1
-
-            # pad the states and actions so that each sample in this batch has the same size
-            states = pad_sequences(states)
-            actions = pad_sequences(actions)
-
-            # logger.debug('states %s', states)
-            # logger.debug('actions %s', actions)
-            # logger.debug('targets %s', targets)
-
-            self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1,
-                           callbacks=[self.tensorboard])
-
-            epsilon *= epsilon_decay
-
-        return rewards
+    # def train_traces(self, max_steps, episodes=256, batch_size=64, gamma=0.99, epsilon=1,
+    #                  epsilon_decay=0.995, reward_scale=1, step_cost=-0.1, test_steps=1):
+    #     """
+    #     Trains the model while playing at the same time
+    #     :param reward_scale:
+    #     :param test_steps: test the agent after each N steps (batches)
+    #     :param epsilon_decay:
+    #     :param epsilon:
+    #     :param step_cost:
+    #     :param episodes:
+    #     :param max_steps:
+    #     :param batch_size: number of experiences to be used for training (each is used once)
+    #     :param gamma:
+    #     :return: rewards
+    #     """
+    #
+    #     rewards = []
+    #
+    #     for i in range(episodes):
+    #
+    #         # clear the experience buffer
+    #         self.experience = []
+    #
+    #         # save one trace into the buffer
+    #         reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=True,
+    #                                 epsilon=epsilon, reward_scale=reward_scale)
+    #
+    #         logger.info('Episode %s, epsilon = %s, Train reward: %s', i, epsilon, reward)
+    #
+    #         # Test the agent after each N batches of weight updates
+    #         if i == 0 or ((i + 1) % test_steps) == 0:
+    #             reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=False,
+    #                                     epsilon=0, reward_scale=reward_scale)
+    #             rewards.append(reward)
+    #             logger.info('Test reward: %s', reward)
+    #
+    #         last_trace = self.experience
+    #
+    #         trace_length = len(last_trace)
+    #         if trace_length < 1:
+    #             logger.warning('No trace available or empty trace sampled, skipping episode %s', i)
+    #             continue
+    #
+    #         states = [None] * trace_length
+    #         actions = [None] * trace_length
+    #         targets = np.zeros((trace_length, 1))
+    #
+    #         final_reward = None
+    #
+    #         j = 0
+    #         reward_decay = 1
+    #         for state, action, reward, _, _, _ in reversed(last_trace):
+    #             if not final_reward:
+    #                 final_reward = reward
+    #                 target = reward
+    #             else:
+    #                 # TODO - adaptive scaling?
+    #                 # TODO target = reward + final_reward * reward_decay (* epsilon)? or combine with a q-step
+    #                 target = reward + final_reward * reward_decay
+    #
+    #             # if not finished:
+    #             # get an action with maximum Q value
+    #             # q_max = -np.math.inf
+    #             # for action_next in actions_next:
+    #             #     q = self.q(state_next, action_next)
+    #             #     if q > q_max:
+    #             #         q_max = q
+    #             # target += gamma * q_max
+    #
+    #             states[j] = state
+    #             actions[j] = action
+    #             targets[j] = target
+    #
+    #             reward_decay *= gamma
+    #             j += 1
+    #
+    #         # pad the states and actions so that each sample in this batch has the same size
+    #         states = pad_sequences(states)
+    #         actions = pad_sequences(actions)
+    #
+    #         logger.debug('states %s', states)
+    #         logger.debug('actions %s', actions)
+    #         logger.debug('targets %s', targets)
+    #
+    #         self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1,
+    #                        callbacks=[self.tensorboard])
+    #
+    #         epsilon *= epsilon_decay
+    #
+    #     return rewards
 
     def q_precomputed_state(self, state, actions, penalize_history=False):
         """
         returns the Q-value of a single (state, action) pair
         :param state: state text data (embedding index)
         :param actions: actions text data (embedding index)
-        :param penalize_history:
+        :param penalize_history: account for history in this episode - penalize already visited (state, action) tuples
         :return: (best action index, best action Q-value estimated by the NN model)
         """
 
@@ -666,7 +665,7 @@ class LSTMAgent(agent.Agent):
         q_max = -np.math.inf
         best_action = 0
 
-        # logger.debug('q for state %s', state)
+        logger.debug('q for state %s', state)
         for i in range(len(actions)):
 
             action = actions[i]
@@ -674,17 +673,18 @@ class LSTMAgent(agent.Agent):
 
             q = self.model_dot_state_action.predict(
                 [state_dense.reshape((1, len(state_dense))), action_dense.reshape((1, len(action_dense)))])[0][0]
-
-            # logger.debug('q for action "%s" is %s', action, q)
+            logger.debug('q for action %s is %s', action, q)
 
             if penalize_history:
-                # q is in <-1, 1>:
-                # history = (self.get_history(state, action) + 1)
-                # if history > 2:
-                #     print(history, ' ', q)
-                # q -= 0.01 * history
-                # q = q ** (self.get_history(state, action) + 1)
-                q = q
+                # q is a cosine similarity (dot product of normalized vectors), ergo q is in [-1; 1]
+                # map it to [0; 1]
+                q = (q + 1) / 2
+
+                # apply intrinsic motivation (penalize already known (state, action) tuples)
+                q = q ** (self.get_history(state, action) + 1)
+
+                # map q back to [-1; 1]
+                q = (q * 2) - 1
 
             if q > q_max:
                 q_max = q
