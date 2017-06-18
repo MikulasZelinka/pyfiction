@@ -334,7 +334,8 @@ class LSTMAgent(agent.Agent):
             # store only episodes that did not exceed max steps
             if store_experience and steps < max_steps:
                 for last_state, last_action, reward, state, actions, finished in experiences:
-                    self.store_experience(last_state, last_action, reward, state, actions, finished, store_text)
+                    self.store_experience(last_state, last_action, reward,
+                                          state, actions, finished, reward_scale, store_text)
 
             self.reset()
 
@@ -364,7 +365,7 @@ class LSTMAgent(agent.Agent):
         return state_sequence, action_sequence, reward, state_next_sequence, actions_next_sequences, finished
 
     def store_experience(self, state_text, action_text, reward, state_next_text, actions_next_texts, finished,
-                         store_text_only=False):
+                         reward_scale=1, store_text_only=False):
 
         # storing the text version of experience is only necessary prior to fitting the tokenizer
         if store_text_only:
@@ -385,18 +386,19 @@ class LSTMAgent(agent.Agent):
 
         if finished and exp_list not in self.unique_endings:
             self.unique_endings.append(exp_list)
-            logger.info('New unique final experience - total %s.\nReward: %s, state: %s...',
-                        len(self.unique_endings),
-                        reward,
-                        state_next_text[:64])
+            # logger.info('New unique final experience - total {}.\nReward: {:.1f}, state: {}...'.format(
+            #             len(self.unique_endings),
+            #             reward * reward_scale,
+            #             state_next_text[:64]))
 
         # TODO - prioritize unique positive AND unique cycled/not finished/extremely negative?
-        if reward >= 0 and exp_list not in self.unique_prioritized:
+        if reward > 0 and exp_list not in self.unique_prioritized:
             self.unique_prioritized.append(exp_list)
-            logger.info('New unique positive experience - total %s.\nReward: %s, state: %s...',
-                        len(self.unique_prioritized),
-                        reward,
-                        state_next_text[:64])
+            logger.info('New unique positive experience - total {}.\nReward: {:.1f}, state: {}...'.format(
+                len(self.unique_prioritized),
+                reward * reward_scale,
+                state_next_text[:64]))
+
             self.experience_prioritized.append(experience)
 
     def train_offline(self, episodes=1, batch_size=32, gamma=0.99, prioritized=False):
@@ -477,10 +479,10 @@ class LSTMAgent(agent.Agent):
         for i in range(episodes):
 
             # Let the agent sample and store game data with the given epsilon (usually decreasing over time)
-            reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=True,
+            reward = self.play_game(max_steps=max_steps, episodes=4, step_cost=step_cost, store_experience=True,
                                     epsilon=epsilon, reward_scale=reward_scale)
 
-            logger.info('Episode {}, epsilon = {:.4f}'.format(i, epsilon))
+            logger.info('\n------------------------------------------\nEpisode {}, epsilon = {:.4f}'.format(i, epsilon))
             logger.info('Train reward: {:.1f}'.format(reward))
 
             # Test the agent after each N batches of weight updates
@@ -544,8 +546,7 @@ class LSTMAgent(agent.Agent):
             # if i + 1 == episodes:
             #     callbacks = [self.tensorboard]
 
-            # TODO - more epochs = higher efficiency
-            self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=16, verbose=1,
+            self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=0,
                            callbacks=callbacks)
 
             epsilon *= epsilon_decay
