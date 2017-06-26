@@ -1,4 +1,6 @@
-TODO
+Simulators
+----------
 
-- better organise simulators
-- describe simulators structure and logic (general platform simulators and specific game simulators)
+- this folder contains general simulators (HTML, Glulxe, Z-machine...)
+- `text_games` folder contains a submodule of simulators by jvking
+- `games` folder contains concrete game simulators

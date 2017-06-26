@@ -4,3 +4,4 @@ __pycache__/
 *.egg-info/
 pyfiction/agents/savingjohn/logs/
 pyfiction/agents/machineofdeath/logs/
+pyfiction/simulators/games/*.log

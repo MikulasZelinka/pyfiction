@@ -1,13 +1,9 @@
-import datetime
 import logging
-import os
 
-from keras.models import load_model
 from keras.optimizers import RMSprop
 from keras.utils import plot_model
-
 from pyfiction.agents.lstm_agent import LSTMAgent
-from pyfiction.simulators.machineofdeath_simulator import MachineOfDeathSimulator
+from pyfiction.simulators.games.machineofdeath_simulator import MachineOfDeathSimulator
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)

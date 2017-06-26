@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html><!--
+
+Created with Squiffy 5.1.0
+
+
+https://github.com/textadventures/squiffy
+
+--><head>
+<meta http-equiv="content-type" content="text/html; charset=windows-1252">
+		<title>The Red Hair</title>
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<script src="index_files/jquery.js"></script>
+		<script src="index_files/story.js" charset="UTF-8"></script>
+		
+		<script>
+			jQuery(function($){
+				$('#squiffy').squiffy();
+				var restart = function () {
+					$('#squiffy').squiffy('restart');
+				};
+				$('#restart').click(restart);
+				$('#restart').keypress(function (e) {
+					if (e.which !== 13) return;
+					restart();
+				});
+			});
+		</script>
+		<link rel="stylesheet" href="index_files/style.css">
+	</head>
+	<body>
+		<div id="squiffy-container">
+			<div id="squiffy-header">
+				<a class="squiffy-header-link" id="restart" tabindex="0">Restart</a>
+			</div>
+			<div id="squiffy">
+			</div>
+		</div>
+	
+
+</body></html>

@@ -2,7 +2,7 @@ import random
 from subprocess import call
 
 from pyfiction.agents import agent
-from pyfiction.simulators.six_simulator import SixSimulator
+from pyfiction.simulators.games.six_simulator import SixSimulator
 
 
 class RandomWalkerAgent(agent.Agent):

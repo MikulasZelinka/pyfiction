@@ -1,11 +1,10 @@
 import random
 import time
-from pyfiction.agents import agent
-from pyfiction.simulators.machineofdeath_simulator import MachineOfDeathSimulator
-from pyfiction.simulators.savingjohn_simulator import SavingJohnSimulator
+
 # StoryNode import is needed for unpickling the game file:
-from pyfiction.simulators.text_games.simulators.MySimulator import StoryNode
 import numpy as np
+from pyfiction.agents import agent
+from pyfiction.simulators.games.savingjohn_simulator import SavingJohnSimulator
 
 
 # This agent randomly searches the action space and remembers the best trace and the best final reward for each state

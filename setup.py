@@ -105,5 +105,5 @@ setup(
         'console_scripts': [
             'pyfiction=pyfiction:main',
         ],
-    }, install_requires=['numpy', 'keras']
+    }, install_requires=['numpy', 'keras', 'selenium']
 )
