@@ -7,11 +7,12 @@ from pyfiction.simulators.html_simulator import HTMLSimulator
 class HowlingDogsSimulator(HTMLSimulator):
     def __init__(self, shuffle=True):
         super().__init__(HowlingDogs, shuffle=shuffle)
+        self.restart()
 
     def restart(self):
         self.driver.execute_script('state.restart()')
         # self.driver.get('file:///' + self.game.path)
-        self.__startup_actions()
+        self.startup_actions()
 
     def write(self, action_index):
         action = self.actions[action_index]
@@ -20,13 +21,13 @@ class HowlingDogsSimulator(HTMLSimulator):
     def read(self):
 
         # text is always here:
-        text = self.driver.find_element_by_css_selector("div[class='body content']").text
+        text = self.driver.find_element_by_css_selector("div[id='passages']").text
 
         # actions are always of one of the two class sets below:
         self.actions = [action.text for action in self.driver.find_elements_by_class_name("internalLink")]
 
         try:
-            back = self.driver.find_element_by_id("back")
+            back = self.driver.find_element_by_class_name("back")
         except:
             back = None
         if back:
@@ -36,21 +37,21 @@ class HowlingDogsSimulator(HTMLSimulator):
 
         if not self.actions:
             ending = text.lower()
-            if ending.startswith('you lose'):
-                reward = -5
-            elif ending.endswith('all there is left is a red hair') or ending.endswith(
-                'it was the clown statue missing'):
-                reward = -10
-            elif text.lower().startswith('you stay in the bedroom and eventually the parents come back and thank you'):
+            if ending.startswith('for everyone who feels that way'):
                 reward = 10
+            elif ending.startswith('howling dogs by porpentine'):
+                reward = -10
             else:
                 print('Game ended and no actions left but an unknown ending reached, cannot assign reward: ',
-                                ending)
+                      ending)
 
         elif self.shuffle:
             random.shuffle(self.actions)
 
         return text, self.actions, reward
+
+    def startup_actions(self):
+        super(HowlingDogsSimulator, self).startup_actions()
 
     def close(self):
         self.driver.close()
@@ -74,6 +75,10 @@ if __name__ == '__main__':
 
             action = random.randint(0, len(actions) - 1)
             simulator.write(action)
+            print(actions[action])
+            print('-------------------')
+
+        print('****************************************************************')
 
         simulator.restart()
 

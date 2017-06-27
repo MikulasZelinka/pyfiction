@@ -331,8 +331,8 @@ class LSTMAgent(agent.Agent):
                 total_reward += reward
                 steps += 1
 
-            # store only episodes that did not exceed max steps
-            if store_experience and steps < max_steps:
+            # store only episodes that did not exceed max steps or if still getting tokens
+            if store_experience and (steps < max_steps or store_text):
                 for last_state, last_action, reward, state, actions, finished in experiences:
                     self.store_experience(last_state, last_action, reward,
                                           state, actions, finished, reward_scale, store_text)
@@ -386,10 +386,10 @@ class LSTMAgent(agent.Agent):
 
         if finished and exp_list not in self.unique_endings:
             self.unique_endings.append(exp_list)
-            # logger.info('New unique final experience - total {}.\nReward: {:.1f}, state: {}...'.format(
-            #             len(self.unique_endings),
-            #             reward * reward_scale,
-            #             state_next_text[:64]))
+            logger.info('New unique final experience - total {}.\nReward: {:.1f}, state: {}...'.format(
+                        len(self.unique_endings),
+                        reward * reward_scale,
+                        state_next_text[:64]))
 
         # TODO - prioritize unique positive AND unique cycled/not finished/extremely negative?
         if reward > 0 and exp_list not in self.unique_prioritized:

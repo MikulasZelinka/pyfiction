@@ -10,13 +10,12 @@ class HTMLSimulator(Simulator):
         self.game = game
         self.driver.get('file:///' + self.game.path)
         self.shuffle = shuffle
-        # self.restart()
 
     def restart(self):
         pass
 
-    def __startup_actions(self):
-        for action in self.game.__startup_actions:
+    def startup_actions(self):
+        for action in self.game.startup_actions:
             self.read()
             self.write(action)
 

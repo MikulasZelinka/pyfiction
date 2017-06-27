@@ -58,12 +58,16 @@ class RandomSearchAgent(agent.Agent):
         if not self.trace:
             return
 
-        if self.totalReward > self.bestReward:
+        # if self.totalReward > self.bestReward:
+        if True:
             self.bestReward = self.totalReward
             self.bestTrace = self.trace
             print('new best reward : {0:10.3f}'.format(self.bestReward))
             print('new best actions: ', [x[3] for x in self.bestTrace])
             print('last state: ', self.trace[-1][0])
+            print('----')
+            print(self.trace[-10:])
+            print('----')
 
         for state, _, _, _ in self.trace:
             if state in self.states:
