@@ -5,10 +5,11 @@ from pyfiction.simulators.simulator import Simulator
 
 class HTMLSimulator(Simulator):
 
-    def __init__(self, game):
+    def __init__(self, game, shuffle=True):
         self.driver = webdriver.Chrome()
         self.game = game
         self.driver.get('file:///' + self.game.path)
+        self.shuffle = shuffle
         # self.restart()
 
     def restart(self):

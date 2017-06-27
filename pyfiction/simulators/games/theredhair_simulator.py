@@ -5,8 +5,8 @@ from pyfiction.simulators.html_simulator import HTMLSimulator
 
 
 class TheRedHairSimulator(HTMLSimulator):
-    def __init__(self):
-        super().__init__(TheRedHair)
+    def __init__(self, shuffle=True):
+        super().__init__(TheRedHair, shuffle=shuffle)
 
     def restart(self):
         # must restart in loop in case the button is not available yet
@@ -19,7 +19,8 @@ class TheRedHairSimulator(HTMLSimulator):
             if restarted:
                 break
 
-    def write(self, action):
+    def write(self, action_index):
+        action = self.actions[action_index]
         self.driver.find_element_by_link_text(action).click()
 
     def read(self):
@@ -28,16 +29,18 @@ class TheRedHairSimulator(HTMLSimulator):
         text = (self.driver.find_elements_by_css_selector("div")[-1]).text
 
         # actions are always of one of the two class sets below:
-        actions = self.driver.find_elements_by_css_selector("a[class='squiffy-link link-section']")
+        self.actions = [action.text for action in
+                        self.driver.find_elements_by_css_selector("a[class='squiffy-link link-section']")]
         # don't fail if there are no actions of the second class
         try:
-            actions += self.driver.find_elements_by_css_selector("a[class='squiffy-link link-passage']")
+            self.actions += [action.text for action in
+                             self.driver.find_elements_by_css_selector("a[class='squiffy-link link-passage']")]
         except:
             pass
 
         reward = -0.1
 
-        if not actions:
+        if not self.actions:
             ending = text.lower()
             if ending.startswith('you lose'):
                 reward = -5
@@ -50,7 +53,10 @@ class TheRedHairSimulator(HTMLSimulator):
                 raise Exception('Game ended and no actions left but an unknown ending reached, cannot assign reward: ',
                                 ending)
 
-        return text, actions, reward
+        elif self.shuffle:
+            random.shuffle(self.actions)
+
+        return text, self.actions, reward
 
 
 if __name__ == '__main__':
@@ -59,17 +65,17 @@ if __name__ == '__main__':
     for i in range(16):
 
         while True:
-            text, actions, reward = simulator.read()
+            state, actions, reward = simulator.read()
 
-            print(text)
+            print(state)
             for action in actions:
-                print(action.text)
+                print(action)
             print(reward)
 
             if not actions:
                 break
 
-            action = actions[random.randint(0, len(actions) - 1)].text
+            action = random.randint(0, len(actions) - 1)
             simulator.write(action)
 
         simulator.restart()

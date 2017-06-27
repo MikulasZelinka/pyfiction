@@ -10,6 +10,9 @@ from pyfiction.simulators.games.savingjohn_simulator import SavingJohnSimulator
 # This agent randomly searches the action space and remembers the best trace and the best final reward for each state
 # Best trace is a list of all game states and actions resulting in the largest cumulative reward
 # Also finds the best possible cumulative reward for each visited state
+from pyfiction.simulators.games.theredhair_simulator import TheRedHairSimulator
+
+
 class RandomSearchAgent(agent.Agent):
     def __init__(self):
         random.seed(0)
@@ -122,9 +125,10 @@ def main():
     agent = RandomSearchAgent()
     start_time = time.time()
     # simulator = MachineOfDeathSimulator()
-    simulator = SavingJohnSimulator()
+    # simulator = SavingJohnSimulator()
+    simulator = TheRedHairSimulator()
     num_episode = 0
-    episodes = 2 ** 20
+    episodes = 2 ** 6
     while num_episode < episodes:
 
         (text, actions, reward) = simulator.read()

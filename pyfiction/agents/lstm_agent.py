@@ -520,12 +520,15 @@ class LSTMAgent(agent.Agent):
                     state, action, reward, state_next, actions_next, finished = self.experience[
                         batches_prioritized[b - batch]]
 
-                target = reward
+                _, current_q = self.q_precomputed_state(state, [action], penalize_history=True)
+                alpha = 1
+
+                target = current_q + alpha * (reward - current_q)
 
                 if not finished:
                     # get an action with maximum Q value
                     _, q_max = self.q_precomputed_state(state_next, actions_next, penalize_history=True)
-                    target += gamma * q_max
+                    target += alpha * gamma * q_max
 
                 states[b] = state
                 actions[b] = action
