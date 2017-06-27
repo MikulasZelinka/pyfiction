@@ -4,6 +4,7 @@ import time
 # StoryNode import is needed for unpickling the game file:
 import numpy as np
 from pyfiction.agents import agent
+from pyfiction.simulators.games.howlingdogs_simulator import HowlingDogsSimulator
 from pyfiction.simulators.games.savingjohn_simulator import SavingJohnSimulator
 
 
@@ -126,7 +127,8 @@ def main():
     start_time = time.time()
     # simulator = MachineOfDeathSimulator()
     # simulator = SavingJohnSimulator()
-    simulator = TheRedHairSimulator()
+    # simulator = TheRedHairSimulator()
+    simulator = HowlingDogsSimulator()
     num_episode = 0
     episodes = 2 ** 6
     while num_episode < episodes:

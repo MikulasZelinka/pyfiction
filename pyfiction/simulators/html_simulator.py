@@ -16,10 +16,9 @@ class HTMLSimulator(Simulator):
         pass
 
     def __startup_actions(self):
-        # for action in self.game.__startup_actions:
-        #     self.read()
-        #     self.write(action)
-        pass
+        for action in self.game.__startup_actions:
+            self.read()
+            self.write(action)
 
     def write(self, text):
         pass
