@@ -16,7 +16,7 @@ An example agent for Machine of Death that uses online learning and prioritized 
 agent = LSTMAgent(simulator=MachineOfDeathSimulator)
 
 # Learn the vocabulary (the function samples the game using a random policy)
-agent.initialize_tokens(iterations=8192, max_steps=500)
+agent.initialize_tokens(iterations=2**13, max_steps=500)
 
 optimizer = RMSprop(lr=0.0005)
 

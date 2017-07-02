@@ -4,6 +4,7 @@ from keras.optimizers import RMSprop
 from keras.utils import plot_model
 from pyfiction.agents.lstm_agent import LSTMAgent
 from pyfiction.simulators.games.savingjohn_simulator import SavingJohnSimulator
+from pyfiction.simulators.text_games.simulators.MySimulator import StoryNode
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)

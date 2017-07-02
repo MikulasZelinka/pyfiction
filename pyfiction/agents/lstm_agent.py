@@ -4,6 +4,7 @@ import random
 
 import datetime
 import numpy as np
+import re
 from keras import Input
 from keras.callbacks import TensorBoard
 from keras.engine import Model
@@ -19,9 +20,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def preprocess(text, chars='', expand=True):
+def preprocess(text, chars='', remove_all_special=True, expand=True):
     """
     function that removes whitespaces, converts to lowercase, etc.
+    :param remove_all_special:
     :param expand: expand 'll, 'm and similar expressions to reduce the number of different tokens
     :param text: text input
     :param chars: chars to be removed
@@ -38,6 +40,10 @@ def preprocess(text, chars='', expand=True):
 
     # convert to lowercase
     text = text.lower()
+
+    # remove all characters except alphanum, spaces and - ' "
+    if remove_all_special:
+        text = re.sub('[^ \-\sA-Za-z0-9"\']+', ' ', text)
 
     # expand unambiguous 'm, 't, 're, ... expressions
     if expand:
@@ -308,8 +314,8 @@ class LSTMAgent(agent.Agent):
                 (state, actions, reward) = self.simulator.read()
                 state = preprocess(state)
                 actions = [preprocess(a) for a in actions]
-                # if not store_text:
-                #     print(actions)
+                if store_text:
+                    print(actions)
                 #     print(self.vectorize(actions))
                 finished = len(actions) < 1
 
@@ -323,6 +329,7 @@ class LSTMAgent(agent.Agent):
                 if reward == 0 and not finished:
                     reward = step_cost
 
+                # scale the reward from [-reward_scale, reward_scale] to [-1, 1]
                 reward /= reward_scale
 
                 if store_experience:

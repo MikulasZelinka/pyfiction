@@ -90,8 +90,20 @@ function clone(a){var constructor,b,proto;if(!a||typeof a!="object"){return a
 
 var hasPushState=!!window.history&&(typeof window.history.pushState=="function")&&(function(a){try{a.setItem("test","1");a.removeItem("test");return true}catch(e){return false
 }}(window.sessionStorage));Tale.prototype.canBookmark=function(){return this.canUndo()&&!this.storysettings.lookup("hash")&&(this.storysettings.lookup("bookmark",true)||!hasPushState)};History.prototype.init=function(){var a=this;if(!this.restore()){if(tale.has("StoryInit")){new Wikifier(insertElement(null,"span"),tale.get("StoryInit").text)}this.display("Start",null)}if(!hasPushState){this.hash=window.location.hash;this.interval=window.setInterval(function(){a.watchHash()},250)}};hasPushState&&(History.prototype.pushState=function(replace,uri){window.history[replace?"replaceState":"pushState"]({id:this.id,length:this.history.length},document.title,uri)});History.prototype.display=function(title,source,type,callback){var i,e,q,bookmark,hash,c=tale.get(title),p=document.getElementById("passages");if(c==null){return
-}if(type!="back"){this.saveVariables(c,source,callback);hash=(tale.storysettings.lookup("hash")&&this.save())||"";if(hasPushState&&tale.canUndo()){try{sessionStorage.setItem("Twine.History"+this.id,JSON.stringify(decompile(this.history)));this.pushState(this.history.length<=2&&window.history.state=="",hash)}catch(e){alert("Your browser couldn't save the state of the "+tale.identity()+".\n"+"You may continue playing, but it will no longer be possible to undo moves from here on in.");tale.storysettings.undo="off"}}}this.hash=hash||this.save();e=c.render();if(type!="quietly"){if(hasTransition){for(i=0;i<p.childNodes.length;i+=1){
+}if(type!="back"){
 
+    this.saveVariables(c,source,callback);hash=(tale.storysettings.lookup("hash")&&this.save())||"";if(hasPushState&&tale.canUndo()){try{
+
+        sessionStorage.setItem("Twine.History"+this.id,JSON.stringify(decompile(this.history)));
+        this.pushState(this.history.length<=2&&window.history.state=="",hash)
+
+    }catch(e){
+        // removed browser couldn't save the state alert here
+        tale.storysettings.undo="off"}}
+
+}this.hash=hash||this.save();e=c.render();if(type!="quietly"){if(hasTransition){for(i=0;i<p.childNodes.length;i+=1){
+
+    // removed smooth visibility transitions here
     q=p.childNodes[i];
     if(q.parentNode){q.parentNode.removeChild(q)}}
 
