@@ -6,9 +6,10 @@ from pyfiction.simulators.html_simulator import HTMLSimulator
 
 class TheRedHairSimulator(HTMLSimulator):
     def __init__(self, shuffle=True):
-        super().__init__(TheRedHair, shuffle=shuffle)
+        super(TheRedHairSimulator, self).__init__(TheRedHair, shuffle=shuffle)
 
     def restart(self):
+        # super().restart()
         # must restart in loop in case the button is not available yet
         while True:
             restarted = True

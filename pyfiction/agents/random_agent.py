@@ -6,8 +6,11 @@ import numpy as np
 from pyfiction.agents import agent
 from pyfiction.simulators.games.catsimulator2016_simulator import CatSimulator2016Simulator
 from pyfiction.simulators.games.howlingdogs_simulator import HowlingDogsSimulator
+from pyfiction.simulators.games.machineofdeath_simulator import MachineOfDeathSimulator
 from pyfiction.simulators.games.savingjohn_simulator import SavingJohnSimulator
 from pyfiction.simulators.games.theredhair_simulator import TheRedHairSimulator
+
+from pyfiction.simulators.text_games.simulators.MySimulator import StoryNode
 
 # This agent randomly searches the action space and remembers:
 #  - the best trace and the best final cumulative reward for each state
@@ -54,7 +57,7 @@ class RandomSearchAgent(agent.Agent):
         if actions:
             index = random.randint(0, len(actions) - 1)
             action = actions[index]
-            print('choosing action:', action)
+            # print('choosing action:', action)
 
         self.trace.append([state, actions, reward, action])
         return index
@@ -91,8 +94,8 @@ class RandomSearchAgent(agent.Agent):
            self.endings.append(ending)
            print('endings count: ', len(self.endings))
 
-        print()
-        print()
+        # print()
+        # print()
 
         self.totalReward = 0
         self.trace = []
@@ -105,11 +108,11 @@ def main():
     start_time = time.time()
     # simulator = MachineOfDeathSimulator()
     # simulator = SavingJohnSimulator()
-    # simulator = TheRedHairSimulator()
+    simulator = TheRedHairSimulator()
     # simulator = HowlingDogsSimulator()
-    simulator = CatSimulator2016Simulator()
+    # simulator = CatSimulator2016Simulator()
     num_episode = 0
-    episodes = 2 ** 6
+    episodes = 16
     while num_episode < episodes:
 
         (text, actions, reward) = simulator.read()
@@ -135,8 +138,10 @@ def main():
     print(list(zip(agent.rewards, agent.states)))
     print()
 
-    print('ENDINGS:', len(agent.endings), ' ----------------------------- ')
-    for ending in agent.endings:
+    endings = agent.endings
+
+    print('ENDINGS:', len(endings), ' ----------------------------- ')
+    for ending in endings:
         print(ending)
         print('*********************')
 

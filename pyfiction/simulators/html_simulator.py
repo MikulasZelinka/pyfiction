@@ -8,11 +8,12 @@ class HTMLSimulator(Simulator):
     def __init__(self, game, shuffle=True):
         self.driver = webdriver.Chrome()
         self.game = game
-        self.driver.get('file:///' + self.game.path)
         self.shuffle = shuffle
+        self.driver.get('file:///' + self.game.path)
 
     def restart(self):
-        pass
+        self.driver.get('file:///' + self.game.path)
+
 
     def startup_actions(self):
         for action in self.game.startup_actions:
