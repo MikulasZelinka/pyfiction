@@ -20,20 +20,22 @@ class TheRedHairSimulator(HTMLSimulator):
                 break
 
     def write(self, action_index):
-        action = self.actions[action_index]
-        self.driver.find_element_by_link_text(action).click()
+        action = self.actions[action_index][1]
+        action.click()
 
     def read(self):
 
         # text is always in the last div:
         text = (self.driver.find_elements_by_css_selector("div")[-1]).text
 
-        # actions are always of one of the two class sets below:
-        self.actions = [action.text for action in
-                        self.driver.find_elements_by_css_selector("a[class='squiffy-link link-section']")]
+        self.actions = []
+
         # don't fail if there are no actions of the second class
         try:
-            self.actions += [action.text for action in
+            # actions are always of one of the two class sets below:
+            self.actions += [(action.text, action) for action in
+                            self.driver.find_elements_by_css_selector("a[class='squiffy-link link-section']")]
+            self.actions += [(action.text, action) for action in
                              self.driver.find_elements_by_css_selector("a[class='squiffy-link link-passage']")]
         except:
             pass
@@ -43,12 +45,12 @@ class TheRedHairSimulator(HTMLSimulator):
         if not self.actions:
             ending = text.lower()
             if ending.startswith('you lose'):
-                reward = -5
+                reward = -10
             elif ending.endswith('all there is left is a red hair') or ending.endswith(
                 'it was the clown statue missing'):
-                reward = -10
+                reward = -20
             elif text.lower().startswith('you stay in the bedroom and eventually the parents come back and thank you'):
-                reward = 10
+                reward = 20
             else:
                 raise Exception('Game ended and no actions left but an unknown ending reached, cannot assign reward: ',
                                 ending)
@@ -56,7 +58,7 @@ class TheRedHairSimulator(HTMLSimulator):
         elif self.shuffle:
             random.shuffle(self.actions)
 
-        return text, self.actions, reward
+        return text, [action[0] for action in self.actions], reward
 
     def close(self):
         self.driver.close()
