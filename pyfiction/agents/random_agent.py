@@ -8,6 +8,7 @@ from pyfiction.simulators.games.catsimulator2016_simulator import CatSimulator20
 from pyfiction.simulators.games.howlingdogs_simulator import HowlingDogsSimulator
 from pyfiction.simulators.games.machineofdeath_simulator import MachineOfDeathSimulator
 from pyfiction.simulators.games.savingjohn_simulator import SavingJohnSimulator
+from pyfiction.simulators.games.starcourt_simulator import StarCourtSimulator
 from pyfiction.simulators.games.theredhair_simulator import TheRedHairSimulator
 from pyfiction.simulators.games.transit_simulator import TransitSimulator
 
@@ -112,9 +113,10 @@ def main():
     # simulator = TheRedHairSimulator()
     # simulator = HowlingDogsSimulator()
     # simulator = CatSimulator2016Simulator()
-    simulator = TransitSimulator()
+    # simulator = TransitSimulator()
+    simulator = StarCourtSimulator()
     num_episode = 0
-    episodes = 1024
+    episodes = 32
     while num_episode < episodes:
 
         (text, actions, reward) = simulator.read()
