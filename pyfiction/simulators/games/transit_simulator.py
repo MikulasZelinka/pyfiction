@@ -40,54 +40,60 @@ class TransitSimulator(HTMLSimulator):
         text = last_state.text
         self.actions = []
 
-        # try:
         self.actions += [(action.text, action) for action in last_state.find_elements_by_tag_name("a") if
                          action.text]
 
-        # except Exception as e:
-        #     raise(e)
+        had_actions = len(self.actions) > 0
 
         # filter the already used actions (workaround for the game bug that causes infinite loops)
         self.actions = [action for action in self.actions if action[0] not in self.actions_history]
 
         reward = -0.1
 
-        # detect good endings (bad endings have no actions)
-        if len(self.actions) == 1 and self.actions[0][0] == "spoilers":
-            self.actions = []
+        if had_actions and not self.actions:
+            print('WARNING: Transit simulator removed all actions because of a game bug! Ending with a 0 reward.')
+            return '', [], 0
+
 
         if not self.actions:
             ending = text.lower()
 
-            # slept on the stool but no food
-            if ending.startswith('this was a good idea'):
-                reward = 0
-            # fell down and slept briefly - no food
-            elif ending.startswith('as good a place as any'):
-                reward = -20
-            # killed the bird
-            elif ending.startswith('mine!'):
+            # tackled a man, found the friend
+            if ending.startswith('if anyone can help you'):
                 reward = 10
-            # fell into the sink - no food and no sleep
-            elif ending.startswith('catlike reflexes'):
+            # death by poisoning
+            elif ending.startswith('you buy one more can'):
                 reward = -20
-            # failed to hunt the bird - no food and no sleep
-            elif ending.startswith('finish this'):
-                reward = -20
-            # befriended the bird - food and sleep
-            elif ending.startswith('friendship'):
+            # tackled the correct man
+            elif ending.startswith('even though it was just in-passing'):
                 reward = 20
-            # no food, slept on the counter
-            elif ending.startswith('not this time, water'):
+            # shot by the security
+            elif ending.startswith('you make swift use of'):
+                reward = -20
+            # jail
+            elif ending.startswith('the guards know'):
+                reward = -10
+            # jail
+            elif ending.startswith('as you predicted'):
+                reward = -10
+            # death in a foreign country
+            elif ending.endswith('you close your eyes and submit to death.'):
+                reward = -20
+            # jail in a foreign country
+            elif ending.startswith('you\'re in a country'):
+                reward = -10
+            # escaped to the plane with the help of energy drinks
+            elif ending.startswith('through the haze of the drinks'):
                 reward = 10
-            # slept outside, no food
-            elif ending.startswith('serendipity'):
-                reward = 10
+            # ended in a jail with the help of energy drinks
+            elif ending.startswith('while the last parts of your mind untouched'):
+                reward = -10
             else:
-                # raise Exception('Game ended and no actions left but an unknown ending reached, cannot assign reward: ',
-                #                 ending)
-                print('Game ended and no actions left but an unknown ending reached, cannot assign reward: ',
-                      ending[:100])
+                raise Exception('Game ended and no actions left but an unknown ending reached, cannot assign reward: ',
+                                ending)
+                # print('Game ended and no actions left but an unknown ending reached, cannot assign reward: ',
+                #       ending)
+                # pass
 
 
 

@@ -9,6 +9,7 @@ from pyfiction.simulators.games.howlingdogs_simulator import HowlingDogsSimulato
 from pyfiction.simulators.games.machineofdeath_simulator import MachineOfDeathSimulator
 from pyfiction.simulators.games.savingjohn_simulator import SavingJohnSimulator
 from pyfiction.simulators.games.theredhair_simulator import TheRedHairSimulator
+from pyfiction.simulators.games.transit_simulator import TransitSimulator
 
 from pyfiction.simulators.text_games.simulators.MySimulator import StoryNode
 
@@ -108,11 +109,12 @@ def main():
     start_time = time.time()
     # simulator = MachineOfDeathSimulator()
     # simulator = SavingJohnSimulator()
-    simulator = TheRedHairSimulator()
+    # simulator = TheRedHairSimulator()
     # simulator = HowlingDogsSimulator()
     # simulator = CatSimulator2016Simulator()
+    simulator = TransitSimulator()
     num_episode = 0
-    episodes = 16
+    episodes = 1024
     while num_episode < episodes:
 
         (text, actions, reward) = simulator.read()
