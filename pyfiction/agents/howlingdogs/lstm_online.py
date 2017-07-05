@@ -40,5 +40,5 @@ epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
     rewards = agent.train_online(episodes=1024, max_steps=1000, batch_size=256, gamma=0.95, epsilon=1,
-                                 epsilon_decay=0.99, reward_scale=10, prioritized_fraction=0.25, test_steps=4)
+                                 epsilon_decay=0.99, reward_scale=10, prioritized_fraction=0.25, test_interval=4)
 agent.simulator.close()

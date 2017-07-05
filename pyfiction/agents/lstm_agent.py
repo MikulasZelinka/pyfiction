@@ -316,7 +316,7 @@ class LSTMAgent(agent.Agent):
                 actions = [preprocess(a) for a in actions]
                 if store_text:
                     print(actions)
-                #     print(self.vectorize(actions))
+                # print(self.vectorize(actions))
                 finished = len(actions) < 1
 
                 if steps >= max_steps:
@@ -394,9 +394,9 @@ class LSTMAgent(agent.Agent):
         if finished and exp_list not in self.unique_endings:
             self.unique_endings.append(exp_list)
             logger.info('New unique final experience - total {}.\nReward: {:.1f}, state: {}...'.format(
-                        len(self.unique_endings),
-                        reward * reward_scale,
-                        state_next_text[:64]))
+                len(self.unique_endings),
+                reward * reward_scale,
+                state_next_text[:64]))
 
         # TODO - prioritize unique positive AND unique cycled/not finished/extremely negative?
         if reward > 0 and exp_list not in self.unique_prioritized:
@@ -459,12 +459,14 @@ class LSTMAgent(agent.Agent):
     #         self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
 
     def train_online(self, max_steps, episodes=256, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.99,
-                     prioritized_fraction=0, reward_scale=1, step_cost=-0.1, test_steps=1, checkpoint_steps=64):
+                     prioritized_fraction=0, reward_scale=1, step_cost=-0.1, test_interval=1, test_steps=1,
+                     checkpoint_steps=64):
         """
         Trains the model while playing at the same time
+        :param test_steps:
         :param checkpoint_steps:
         :param reward_scale:
-        :param test_steps: test the agent after each N steps (batches)
+        :param test_interval: test the agent after each N steps (batches)
         :param epsilon_decay: 
         :param epsilon: 
         :param step_cost: 
@@ -493,9 +495,9 @@ class LSTMAgent(agent.Agent):
             logger.info('Train reward: {:.1f}'.format(reward))
 
             # Test the agent after each N batches of weight updates
-            if ((i + 1) % test_steps) == 0:
-                reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=False,
-                                        epsilon=0, reward_scale=reward_scale)
+            if ((i + 1) % test_interval) == 0:
+                reward = self.play_game(max_steps=max_steps, episodes=test_steps, step_cost=step_cost,
+                                        store_experience=False, epsilon=0, reward_scale=reward_scale)
                 rewards.append(reward)
                 logger.info('Test reward: {:.1f}'.format(reward))
 
