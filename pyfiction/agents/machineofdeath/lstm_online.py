@@ -22,7 +22,7 @@ optimizer = RMSprop(lr=0.0005)
 
 embedding_dimensions = 16
 lstm_dimensions = 32
-dense_dimensions = 4
+dense_dimensions = 8
 
 agent.create_model(embedding_dimensions=embedding_dimensions,
                    lstm_dimensions=lstm_dimensions,
@@ -42,7 +42,7 @@ epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
     rewards = agent.train_online(episodes=256*256, max_steps=500, batch_size=256, gamma=0.95, epsilon=1,
-                                 epsilon_decay=0.99, reward_scale=30, prioritized_fraction=0.25, test_interval=8,
+                                 epsilon_decay=0.999, reward_scale=30, prioritized_fraction=0.25, test_interval=8,
                                  test_steps=8)
 
 # Test on paraphrased actions

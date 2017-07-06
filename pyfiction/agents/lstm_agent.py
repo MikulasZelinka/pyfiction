@@ -20,7 +20,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def preprocess(text, chars='', remove_all_special=True, expand=True):
+def softmax(x):
+    """
+    Compute softmax values for each sets of scores in x.
+    Source: https://stackoverflow.com/questions/34968722/softmax-function-python
+    """
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum()
+
+
+def preprocess(text, chars='', remove_all_special=True, expand=True, split_numbers=True):
     """
     function that removes whitespaces, converts to lowercase, etc.
     :param remove_all_special:
@@ -44,6 +53,10 @@ def preprocess(text, chars='', remove_all_special=True, expand=True):
     # remove all characters except alphanum, spaces and - ' "
     if remove_all_special:
         text = re.sub('[^ \-\sA-Za-z0-9"\']+', ' ', text)
+
+    # split numbers into digits to avoid infinite vocabulary size if random numbers are present:
+    if split_numbers:
+        text = re.sub('[0-9]', ' \g<0> ', text)
 
     # expand unambiguous 'm, 't, 're, ... expressions
     if expand:
@@ -133,7 +146,7 @@ class LSTMAgent(agent.Agent):
         actions = self.vectorize(actions)
 
         # return an action with maximum Q value
-        return self.q_precomputed_state(state, actions, penalize_history=True)
+        return self.q_precomputed_state(state, actions, softmax_selection=False, penalize_history=False)
 
     def create_model(self, embedding_dimensions, lstm_dimensions, dense_dimensions, optimizer, embeddings=None,
                      embeddings_trainable=True):
@@ -529,14 +542,14 @@ class LSTMAgent(agent.Agent):
                     state, action, reward, state_next, actions_next, finished = self.experience[
                         batches_prioritized[b - batch]]
 
-                _, current_q = self.q_precomputed_state(state, [action], penalize_history=True)
+                _, current_q = self.q_precomputed_state(state, [action], penalize_history=False)
                 alpha = 1
 
                 target = current_q + alpha * (reward - current_q)
 
                 if not finished:
                     # get an action with maximum Q value
-                    _, q_max = self.q_precomputed_state(state_next, actions_next, penalize_history=True)
+                    _, q_max = self.q_precomputed_state(state_next, actions_next, penalize_history=False)
                     target += alpha * gamma * q_max
 
                 states[b] = state
@@ -663,11 +676,12 @@ class LSTMAgent(agent.Agent):
     #
     #     return rewards
 
-    def q_precomputed_state(self, state, actions, penalize_history=False):
+    def q_precomputed_state(self, state, actions, softmax_selection=False, penalize_history=False):
         """
         returns the Q-value of a single (state, action) pair
         :param state: state text data (embedding index)
         :param actions: actions text data (embedding index)
+        :param softmax_selection: apply random softmax selection
         :param penalize_history: account for history in this episode - penalize already visited (state, action) tuples
         :return: (best action index, best action Q-value estimated by the NN model)
         """
@@ -677,6 +691,8 @@ class LSTMAgent(agent.Agent):
         q_max = -np.math.inf
         best_action = 0
 
+        q_values = np.zeros(len(actions))
+
         logger.debug('q for state %s', state)
         for i in range(len(actions)):
 
@@ -685,7 +701,6 @@ class LSTMAgent(agent.Agent):
 
             q = self.model_dot_state_action.predict(
                 [state_dense.reshape((1, len(state_dense))), action_dense.reshape((1, len(action_dense)))])[0][0]
-            logger.debug('q for action %s is %s', action, q)
 
             if penalize_history:
                 # q is a cosine similarity (dot product of normalized vectors), ergo q is in [-1; 1]
@@ -698,9 +713,21 @@ class LSTMAgent(agent.Agent):
                 # map q back to [-1; 1]
                 q = (q * 2) - 1
 
+            logger.debug('q for action %s is %s', action, q)
+
+            q_values[i] = q
+
             if q > q_max:
                 q_max = q
                 best_action = i
+
+        if softmax_selection:
+            probabilities = softmax(q_values)
+            x = random.random()
+            for i in range(len(actions)):
+                if x <= probabilities[i]:
+                    return i, q_values[i]
+                x -= probabilities[i]
 
         return best_action, q_max
 
