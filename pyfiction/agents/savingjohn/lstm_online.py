@@ -22,8 +22,8 @@ agent.initialize_tokens(iterations=1024, max_steps=100)
 optimizer = RMSprop(lr=0.0005)
 
 embedding_dimensions = 16
-lstm_dimensions = 16
-dense_dimensions = 4
+lstm_dimensions = 32
+dense_dimensions = 8
 
 agent.create_model(embedding_dimensions=embedding_dimensions,
                    lstm_dimensions=lstm_dimensions,
@@ -41,5 +41,11 @@ except ImportError as e:
 epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    rewards = agent.train_online(episodes=1024, max_steps=100, batch_size=256, gamma=0.95, epsilon=0,
-                                 epsilon_decay=0.99, reward_scale=20, prioritized_fraction=0.25, test_interval=1)
+    rewards = agent.train_online(episodes=128, max_steps=100, batch_size=256, gamma=0.95, epsilon=1,
+                                 epsilon_decay=0.99, reward_scale=20, prioritized_fraction=0.25, test_interval=1,
+                                 test_steps=1)
+
+    # inspect model weights:
+    for layer in agent.model.layers:
+        print('layer', layer.name)
+        print(layer.get_weights())

@@ -3,6 +3,8 @@ import os
 import random
 
 import datetime
+from collections import deque
+
 import numpy as np
 import re
 from keras import Input
@@ -110,9 +112,12 @@ class LSTMAgent(agent.Agent):
 
         self.simulator = simulator()
         self.experience = []
-        self.experience_prioritized = []
-        self.unique_endings = []
-        self.unique_prioritized = []
+
+        # for prioritized sampling of positive experiences
+        self.prioritized_experiences_queue = deque(maxlen=64)
+        # for detection of unique experiences (stores lists instead of data used for learning:
+        self.unique_prioritized_experiences_queue = deque(maxlen=64)
+
         self.state_action_history = None
 
         self.model = None
@@ -146,7 +151,7 @@ class LSTMAgent(agent.Agent):
         actions = self.vectorize(actions)
 
         # return an action with maximum Q value
-        return self.q_precomputed_state(state, actions, softmax_selection=False, penalize_history=False)
+        return self.q_precomputed_state(state, actions, softmax_selection=False, penalize_history=True)
 
     def create_model(self, embedding_dimensions, lstm_dimensions, dense_dimensions, optimizer, embeddings=None,
                      embeddings_trainable=True):
@@ -327,8 +332,8 @@ class LSTMAgent(agent.Agent):
                 (state, actions, reward) = self.simulator.read()
                 state = preprocess(state)
                 actions = [preprocess(a) for a in actions]
-                if store_text:
-                    print(actions)
+                # if store_text:
+                #     print(actions)
                 # print(self.vectorize(actions))
                 finished = len(actions) < 1
 
@@ -397,29 +402,23 @@ class LSTMAgent(agent.Agent):
 
         self.experience.append(experience)
 
-        # now return if this experience is not final or doesn't contain a positive reward
-        if not finished and reward < 0:
+        # now return if this experience doesn't contain a positive reward
+        if reward <= 0:
             return
 
-        # store unique final states and/or unique states with a positive reward
+        # change to a hashable type for the 'in' operator below:
         exp_list = (experience[0].tolist(), experience[1].tolist(), experience[2], experience[3].tolist())
 
-        if finished and exp_list not in self.unique_endings:
-            self.unique_endings.append(exp_list)
-            logger.info('New unique final experience - total {}.\nReward: {:.1f}, state: {}...'.format(
-                len(self.unique_endings),
-                reward * reward_scale,
-                state_next_text[:64]))
-
+        # store unique positive experiences
         # TODO - prioritize unique positive AND unique cycled/not finished/extremely negative?
-        if reward > 0 and exp_list not in self.unique_prioritized:
-            self.unique_prioritized.append(exp_list)
+        if reward > 0 and (exp_list not in self.unique_prioritized_experiences_queue):
+            self.unique_prioritized_experiences_queue.append(exp_list)
+            self.prioritized_experiences_queue.append(experience)
             logger.info('New unique positive experience - total {}.\nReward: {:.1f}, state: {}...'.format(
-                len(self.unique_prioritized),
+                len(self.prioritized_experiences_queue),
                 reward * reward_scale,
                 state_next_text[:64]))
 
-            self.experience_prioritized.append(experience)
 
     # def train_offline(self, episodes=1, batch_size=32, gamma=0.99, prioritized=False):
     #     """
@@ -519,8 +518,8 @@ class LSTMAgent(agent.Agent):
 
             batches = np.random.choice(len(self.experience), batch)
 
-            if len(self.experience_prioritized) > 0:
-                batches_prioritized = np.random.choice(len(self.experience_prioritized), batch_prioritized)
+            if len(self.prioritized_experiences_queue) > 0:
+                batches_prioritized = np.random.choice(len(self.prioritized_experiences_queue), batch_prioritized)
             else:
                 batches_prioritized = np.random.choice(len(self.experience), batch_prioritized)
 
@@ -534,8 +533,8 @@ class LSTMAgent(agent.Agent):
                 if b < batch:
                     state, action, reward, state_next, actions_next, finished = self.experience[batches[b]]
                 # prioritized data (if there are any)
-                elif len(self.experience_prioritized) > 0:
-                    state, action, reward, state_next, actions_next, finished = self.experience_prioritized[
+                elif len(self.prioritized_experiences_queue) > 0:
+                    state, action, reward, state_next, actions_next, finished = self.prioritized_experiences_queue[
                         batches_prioritized[b - batch]]
                 # get non-prioritized if there are no prioritized
                 else:
@@ -703,15 +702,17 @@ class LSTMAgent(agent.Agent):
                 [state_dense.reshape((1, len(state_dense))), action_dense.reshape((1, len(action_dense)))])[0][0]
 
             if penalize_history:
-                # q is a cosine similarity (dot product of normalized vectors), ergo q is in [-1; 1]
-                # map it to [0; 1]
-                q = (q + 1) / 2
+                # apply intrinsic motivation (penalize already visited (state, action) tuples)
+                history = self.get_history(state, action)
+                if history:
+                    # q is a cosine similarity (dot product of normalized vectors), ergo q is in [-1; 1]
+                    # map it to [0; 1]
+                    q = (q + 1) / 2
 
-                # apply intrinsic motivation (penalize already known (state, action) tuples)
-                q = q ** (self.get_history(state, action) + 1)
+                    q = q ** (history + 1)
 
-                # map q back to [-1; 1]
-                q = (q * 2) - 1
+                    # map q back to [-1; 1]
+                    q = (q * 2) - 1
 
             logger.debug('q for action %s is %s', action, q)
 
