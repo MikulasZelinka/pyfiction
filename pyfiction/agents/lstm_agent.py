@@ -419,57 +419,6 @@ class LSTMAgent(agent.Agent):
                 reward * reward_scale,
                 state_next_text[:64]))
 
-
-    # def train_offline(self, episodes=1, batch_size=32, gamma=0.99, prioritized=False):
-    #     """
-    #     Picks random experiences and trains the model on them
-    #     :param episodes: number of episodes, in each episode we train batch_size examples
-    #     :param batch_size: number of experiences to be used for training (each is used once in an episode)
-    #     :param gamma: discount factor (higher gamma ~ taking future into account more)
-    #     :param prioritized: only sample prioritized experiences (final states with usually higher reward values)
-    #     :return:
-    #     """
-    #
-    #     source = self.experience
-    #
-    #     if prioritized:
-    #         source = self.experience_prioritized
-    #         logger.debug('Sampling prioritized only, %s from %s', batch_size, len(source))
-    #
-    #     if len(source) < 1:
-    #         logger.warning('No samples for training available.')
-    #         return
-    #
-    #     for x in range(episodes):
-    #
-    #         batches = np.random.choice(len(source), batch_size)
-    #
-    #         states = [None] * batch_size
-    #         actions = [None] * batch_size
-    #         targets = np.zeros((batch_size, 1))
-    #
-    #         for i in range(batch_size):
-    #             state, action, reward, state_next, actions_next, finished = source[batches[i]]
-    #             target = reward
-    #
-    #             if not finished:
-    #                 # get an action with maximum Q value
-    #                 q_max = -np.math.inf
-    #                 for action_next in actions_next:
-    #                     q = self.q(state_next, action_next)
-    #                     if q > q_max:
-    #                         q_max = q
-    #                 target += gamma * q_max
-    #
-    #             states[i] = state
-    #             actions[i] = action
-    #             targets[i] = target
-    #
-    #         states = pad_sequences(states)
-    #         actions = pad_sequences(actions)
-    #
-    #         self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
-
     def train_online(self, max_steps, episodes=256, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.99,
                      prioritized_fraction=0, reward_scale=1, step_cost=-0.1, test_interval=1, test_steps=1,
                      checkpoint_steps=64):
@@ -584,6 +533,88 @@ class LSTMAgent(agent.Agent):
 
         return rewards
 
+    def q_precomputed_state(self, state, actions, softmax_selection=False, penalize_history=False):
+        """
+        returns the Q-value of a single (state, action) pair
+        :param state: state text data (embedding index)
+        :param actions: actions text data (embedding index)
+        :param softmax_selection: apply random softmax selection
+        :param penalize_history: account for history in this episode - penalize already visited (state, action) tuples
+        :return: (best action index, best action Q-value estimated by the NN model)
+        """
+
+        state_dense = self.model_state.predict([state.reshape((1, len(state)))])[0]
+
+        q_max = -np.math.inf
+        best_action = 0
+
+        q_values = np.zeros(len(actions))
+
+        logger.debug('q for state %s', state)
+        for i in range(len(actions)):
+
+            action = actions[i]
+            action_dense = self.model_action.predict([action.reshape((1, len(action)))])[0]
+
+            q = self.model_dot_state_action.predict(
+                [state_dense.reshape((1, len(state_dense))), action_dense.reshape((1, len(action_dense)))])[0][0]
+
+            if penalize_history:
+                # apply intrinsic motivation (penalize already visited (state, action) tuples)
+                history = self.get_history(state, action)
+                if history:
+                    # q is a cosine similarity (dot product of normalized vectors), ergo q is in [-1; 1]
+                    # map it to [0; 1]
+                    q = (q + 1) / 2
+
+                    q = q ** (history + 1)
+
+                    # map q back to [-1; 1]
+                    q = (q * 2) - 1
+
+            logger.debug('q for action %s is %s', action, q)
+
+            q_values[i] = q
+
+            if q > q_max:
+                q_max = q
+                best_action = i
+
+        if softmax_selection:
+            probabilities = softmax(q_values)
+            x = random.random()
+            for i in range(len(actions)):
+                if x <= probabilities[i]:
+                    return i, q_values[i]
+                x -= probabilities[i]
+
+        return best_action, q_max
+
+    def add_to_history(self, state, action):
+
+        state = tuple(np.trim_zeros(state, 'f'))
+        action = tuple(np.trim_zeros(action, 'f'))
+
+        if (state, action) in self.state_action_history:
+            self.state_action_history[(state, action)] += 1
+        else:
+            self.state_action_history[(state, action)] = 1
+
+    def get_history(self, state, action):
+
+        state = tuple(np.trim_zeros(state, 'f'))
+        action = tuple(np.trim_zeros(action, 'f'))
+
+        if (state, action) in self.state_action_history:
+            return self.state_action_history[(state, action)]
+        return 0
+
+    def reset_history(self):
+        self.state_action_history = {}
+
+
+    # offline and per-trace training have not been updated since possibly breaking changes in the agent class
+    # TODO test and readd these
     # def train_traces(self, max_steps, episodes=256, batch_size=64, gamma=0.99, epsilon=1,
     #                  epsilon_decay=0.995, reward_scale=1, step_cost=-0.1, test_steps=1):
     #     """
@@ -675,81 +706,52 @@ class LSTMAgent(agent.Agent):
     #
     #     return rewards
 
-    def q_precomputed_state(self, state, actions, softmax_selection=False, penalize_history=False):
-        """
-        returns the Q-value of a single (state, action) pair
-        :param state: state text data (embedding index)
-        :param actions: actions text data (embedding index)
-        :param softmax_selection: apply random softmax selection
-        :param penalize_history: account for history in this episode - penalize already visited (state, action) tuples
-        :return: (best action index, best action Q-value estimated by the NN model)
-        """
-
-        state_dense = self.model_state.predict([state.reshape((1, len(state)))])[0]
-
-        q_max = -np.math.inf
-        best_action = 0
-
-        q_values = np.zeros(len(actions))
-
-        logger.debug('q for state %s', state)
-        for i in range(len(actions)):
-
-            action = actions[i]
-            action_dense = self.model_action.predict([action.reshape((1, len(action)))])[0]
-
-            q = self.model_dot_state_action.predict(
-                [state_dense.reshape((1, len(state_dense))), action_dense.reshape((1, len(action_dense)))])[0][0]
-
-            if penalize_history:
-                # apply intrinsic motivation (penalize already visited (state, action) tuples)
-                history = self.get_history(state, action)
-                if history:
-                    # q is a cosine similarity (dot product of normalized vectors), ergo q is in [-1; 1]
-                    # map it to [0; 1]
-                    q = (q + 1) / 2
-
-                    q = q ** (history + 1)
-
-                    # map q back to [-1; 1]
-                    q = (q * 2) - 1
-
-            logger.debug('q for action %s is %s', action, q)
-
-            q_values[i] = q
-
-            if q > q_max:
-                q_max = q
-                best_action = i
-
-        if softmax_selection:
-            probabilities = softmax(q_values)
-            x = random.random()
-            for i in range(len(actions)):
-                if x <= probabilities[i]:
-                    return i, q_values[i]
-                x -= probabilities[i]
-
-        return best_action, q_max
-
-    def add_to_history(self, state, action):
-
-        state = tuple(np.trim_zeros(state, 'f'))
-        action = tuple(np.trim_zeros(action, 'f'))
-
-        if (state, action) in self.state_action_history:
-            self.state_action_history[(state, action)] += 1
-        else:
-            self.state_action_history[(state, action)] = 1
-
-    def get_history(self, state, action):
-
-        state = tuple(np.trim_zeros(state, 'f'))
-        action = tuple(np.trim_zeros(action, 'f'))
-
-        if (state, action) in self.state_action_history:
-            return self.state_action_history[(state, action)]
-        return 0
-
-    def reset_history(self):
-        self.state_action_history = {}
+    # def train_offline(self, episodes=1, batch_size=32, gamma=0.99, prioritized=False):
+    #     """
+    #     Picks random experiences and trains the model on them
+    #     :param episodes: number of episodes, in each episode we train batch_size examples
+    #     :param batch_size: number of experiences to be used for training (each is used once in an episode)
+    #     :param gamma: discount factor (higher gamma ~ taking future into account more)
+    #     :param prioritized: only sample prioritized experiences (final states with usually higher reward values)
+    #     :return:
+    #     """
+    #
+    #     source = self.experience
+    #
+    #     if prioritized:
+    #         source = self.experience_prioritized
+    #         logger.debug('Sampling prioritized only, %s from %s', batch_size, len(source))
+    #
+    #     if len(source) < 1:
+    #         logger.warning('No samples for training available.')
+    #         return
+    #
+    #     for x in range(episodes):
+    #
+    #         batches = np.random.choice(len(source), batch_size)
+    #
+    #         states = [None] * batch_size
+    #         actions = [None] * batch_size
+    #         targets = np.zeros((batch_size, 1))
+    #
+    #         for i in range(batch_size):
+    #             state, action, reward, state_next, actions_next, finished = source[batches[i]]
+    #             target = reward
+    #
+    #             if not finished:
+    #                 # get an action with maximum Q value
+    #                 q_max = -np.math.inf
+    #                 for action_next in actions_next:
+    #                     q = self.q(state_next, action_next)
+    #                     if q > q_max:
+    #                         q_max = q
+    #                 target += gamma * q_max
+    #
+    #             states[i] = state
+    #             actions[i] = action
+    #             targets[i] = target
+    #
+    #         states = pad_sequences(states)
+    #         actions = pad_sequences(actions)
+    #
+    #         self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)

@@ -27,43 +27,79 @@ class StarCourtSimulator(HTMLSimulator):
 
         reward = -0.1
 
+        # reward for using favors to upgrade the job/pet/house:
+        if text.startswith('You get a job as a'):
+            reward += 5
+
         # detect endings
         if len(self.actions) == 2 and self.actions[0][0] == "Take survey." and self.actions[1][0] == "Start over.":
             self.actions = []
 
         if not self.actions:
-            ending = text.lower()
+            ending = text
 
-            # remove the first line of the ending (only contains a back arrow):
-            ending = ending[(ending.index('\n') + 1):]
+            # death but no sentence
+            if ending.startswith(
+                'Here on the astral plane, your psychic bodies are as physical and real as your material body is in the physical world.'):
+                reward = -20
+            # death sentence by trial (literally)
+            elif ending.startswith('Nah. You die as poison consumes your body. And because you failed trial by poison, you\'re declared guilty!'):
+                reward = -30
+            # happily ever after
+            elif ending.startswith('You\'re all out of favors! I guess working as a'):
+                reward = 15
+            # death sentence by trial (literally)
+            elif ending.startswith('The only thing Pride finds more beautiful than itself is the destruction of those less beautiful than it!'):
+                reward = -30
+            # death sentence by trial (literally)
+            elif ending.startswith('Immediately upon starting the battle, the titanic creature falls asleep!'):
+                reward = -30
+            # death sentence by trial (literally)
+            elif ending.startswith('You burn in the creature\'s four fiery mouths!'):
+                reward = -30
+            # death sentence by trial (literally)
+            elif ending.startswith('You are torn limb from limb by the many-limbed creature!'):
+                reward = -30
+            # "blasting you right in the core"
+            elif ending.startswith('You remember you training at Psi City and concentrate'):
+                reward = -30
+            # innocent
+            elif ending.startswith('And so you do, spacer, so you do.'):
+                reward = 15
+            # speaks for itself
+            elif ending.startswith("BLAMMO!!\n\nYou're dead! And what's worse, you're guilty!"):
+                reward = -30
 
-            # slept on the stool but no food
-            if ending.startswith('this was a good idea'):
-                reward = 0
-            # fell down and slept briefly - no food
-            elif ending.startswith('as good a place as any'):
+            # sentenced but alive, determine the reward based on length of the sentence: (0 < length < 2000) years mapped to (-20 < reward < 0)
+            elif 'The Judge bangs their laser gavel a final time. "Robailiff, you may take the prisoner away."' in ending:
+                words = ending.split()
+                years = int(words[words.index('years') - 1])
+                reward = -years / 100
+
+            # dead but not guilty
+            elif 'You are neither guilty nor innocent, as law has been dethroned in the universe. However, you have died in a fire.' in ending:
                 reward = -20
-            # killed the bird
-            elif ending.startswith('mine!'):
+            # escaped
+            elif "You let Star Court evaporate like a bad memory. You're on the other side of the sector by the time they notice you're missing." in ending:
                 reward = 10
-            # fell into the sink - no food and no sleep
-            elif ending.startswith('catlike reflexes'):
+            # burned
+            elif 'How does Star Court generate this much trash, you think as you burn.' in ending:
                 reward = -20
-            # failed to hunt the bird - no food and no sleep
-            elif ending.startswith('finish this'):
+            # death
+            elif 'You got smoked by a crime ghost.' in ending:
                 reward = -20
-            # befriended the bird - food and sleep
-            elif ending.startswith('friendship'):
-                reward = 20
-            # no food, slept on the counter
-            elif ending.startswith('not this time, water'):
-                reward = 10
-            # slept outside, no food
-            elif ending.startswith('serendipity'):
-                reward = 10
+            # death
+            elif "Congratulations, you're innocent! You're also dead." in ending:
+                reward = -20
+            # dead and guilty
+            elif "The knife hits you right between the eyes. You are killed immediately, and, what's worse, you're found guilty by the court!" in ending:
+                reward = -30
+
+
+
             else:
-                # raise Exception('Game ended and no actions left but an unknown ending reached, cannot assign reward: ',
-                #                 ending)
+                raise Exception('Game ended and no actions left but an unknown ending reached, cannot assign reward: ',
+                                ending)
                 pass
 
         elif self.shuffle:
@@ -82,20 +118,25 @@ if __name__ == '__main__':
 
     for i in range(100):
 
+        total_reward = 0
+
         while True:
 
             state, actions, reward = simulator.read()
+            total_reward += reward
 
             if state.startswith('‌‌‌‌‌‌‌‌‌‌‌‌‌‌‌‌‌‌‌‌‌‌‌The laser gavel pounds.'):
                 starts += 1
 
-
-            print(state)
-            print('actions: ', actions)
-            print(reward)
-            print('-----------------------------')
+            # print(state)
+            # print('actions: ', actions)
+            # print(reward)
+            # print('-----------------------------')
 
             if not actions:
+                print(state)
+                print('last', reward, 'total', total_reward)
+                print('--------------------')
                 ends += 1
                 break
 
