@@ -28,8 +28,6 @@ class RandomSearchAgent(agent.Agent):
     def __init__(self):
         random.seed(0)
 
-        # we want to find the shortest best solution if possible - use stepCost
-        self.stepCost = -0.1
         self.bestReward = -np.math.inf
         self.bestTrace = []
 
@@ -47,9 +45,6 @@ class RandomSearchAgent(agent.Agent):
         self.reset()
 
     def act(self, state, actions, reward):
-
-        if reward == 0:
-            reward = self.stepCost
 
         self.totalReward += reward
 

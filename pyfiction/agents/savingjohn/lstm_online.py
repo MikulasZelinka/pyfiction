@@ -14,7 +14,7 @@ An example agent for Saving John that uses online learning and prioritized sampl
 """
 
 # Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(simulator=SavingJohnSimulator)
+agent = LSTMAgent(train_simulators=SavingJohnSimulator)
 
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens(iterations=1024, max_steps=100)
@@ -41,9 +41,8 @@ except ImportError as e:
 epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    rewards = agent.train_online(episodes=128, max_steps=100, batch_size=256, gamma=0.95, epsilon=1,
-                                 epsilon_decay=0.99, reward_scale=20, prioritized_fraction=0.25, test_interval=1,
-                                 test_steps=1)
+    agent.train_online(episodes=128, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.99,
+                       prioritized_fraction=0.25, test_interval=1, test_steps=1)
 
     # inspect model weights:
     for layer in agent.model.layers:

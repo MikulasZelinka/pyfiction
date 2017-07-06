@@ -16,7 +16,7 @@ An example agent for The Red Hair that uses online learning and prioritized samp
 agent = LSTMAgent(simulator=TheRedHairSimulator)
 
 # Learn the vocabulary (the function samples the game using a random policy)
-agent.initialize_tokens(iterations=2**5, max_steps=100)
+agent.initialize_tokens(iterations=2 ** 5, max_steps=100)
 
 optimizer = RMSprop()
 
@@ -39,6 +39,6 @@ except ImportError as e:
 epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    rewards = agent.train_online(episodes=1024, max_steps=100, batch_size=256, gamma=0.2, epsilon=1,
-                                 epsilon_decay=0.999, reward_scale=10, prioritized_fraction=0.25, test_interval=4)
+    agent.train_online(episodes=1024, batch_size=256, gamma=0.2, epsilon=1,
+                       epsilon_decay=0.999, prioritized_fraction=0.25, test_interval=4)
 agent.simulator.close()

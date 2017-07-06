@@ -17,6 +17,7 @@ from keras.preprocessing.text import Tokenizer
 from keras.layers import LSTM, Dense, Embedding, Dot
 
 from pyfiction.agents import agent
+from pyfiction.simulators.simulator import Simulator
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -105,12 +106,31 @@ class LSTMAgent(agent.Agent):
     This agent class is universal and it should be possible to apply it to different games in the same way
     """
 
-    def __init__(self, simulator, max_words=8192):
+    def __init__(self, train_simulators, test_simulators=None, max_words=8192):
+        """
+
+        :param train_simulators:
+            A single simulator or a list of game simulators used for training
+        :param test_simulators:
+            A single simulator or a list of game simulators used for testing; if None, train simulators are used
+        :param max_words: maximum vocabulary size
+        """
 
         random.seed(0)
         np.random.seed(0)
 
-        self.simulator = simulator()
+        if type(train_simulators) is Simulator:
+            train_simulators = [train_simulators]
+
+        if type(test_simulators) is Simulator:
+            test_simulators = [test_simulators]
+
+        self.train_simulators = train_simulators
+        self.test_simulators = test_simulators if test_simulators else train_simulators
+
+        # a reference to the currently used simulator, varies in time, used by various agent functions
+        self.simulator = None
+
         self.experience = []
 
         # for prioritized sampling of positive experiences
@@ -228,13 +248,18 @@ class LSTMAgent(agent.Agent):
         model.summary()
         print('---------------')
 
-    def initialize_tokens(self, iterations, max_steps):
+    def initialize_tokens(self):
 
-        logger.info('Initializing tokens by playing the game randomly %s times.', iterations)
+        logger.info('Initializing tokens by playing the game randomly with all train and test simulators')
 
-        # Temporarily store all experience and use it to get the tokens
-        self.play_game(episodes=iterations, max_steps=max_steps, store_experience=True, store_text=True,
-                       epsilon=1, verbose=False)
+        for simulator in list(set(self.train_simulators + self.test_simulators)):
+            logger.info('Playing %s randomly %s times', simulator, simulator.initialization_iterations)
+
+            # Temporarily store all experience and use it to get the tokens, use each simulator once
+            self.play_game(episodes=simulator.initialization_iterations, max_steps=simulator.max_steps,
+                           store_experience=True, initialize_only=True, epsilon=1, simulators=simulator)
+
+        logger.info('Successfully sampled all games, got total %s experiences', len(self.experience))
 
         state_texts = [x[0] for x in self.experience]
         action_texts = [x[1] for x in self.experience]
@@ -242,10 +267,10 @@ class LSTMAgent(agent.Agent):
         logger.info('Fitting tokenizer on action texts and state texts.')
 
         self.tokenizer.fit_on_texts(action_texts)
-        logger.info('Tokenizer after going through actions: %s words - %s', len(self.tokenizer.word_index.items()),
+        logger.info('Tokenizer after fitting on actions: %s words - %s', len(self.tokenizer.word_index.items()),
                     self.tokenizer.word_index)
         self.tokenizer.fit_on_texts(state_texts)
-        logger.info('Tokenizer after adding states on top of actions: %s words - %s',
+        logger.info('Tokenizer after fitting states on top of actions: %s words - %s',
                     len(self.tokenizer.word_index.items()),
                     self.tokenizer.word_index)
 
@@ -282,92 +307,85 @@ class LSTMAgent(agent.Agent):
 
         return sequences
 
-    def reset(self):
-        self.simulator.restart()
-
-    def play_game(self, max_steps, episodes=1, step_cost=-0.1, store_experience=True, store_text=False, epsilon=1,
-                  reward_scale=1, verbose=False):
+    def play_game(self, simulators, episodes=1, store_experience=True, initialize_only=False, epsilon=1):
         """
-        Uses the model to play the game.
-        :param reward_scale:
+        Uses the model to play the game. Each simulator is used to play the game exactly episodes times.
+        :param simulators: a list of games (their simulators) to play the game with (more simulators = more games)
         :param episodes: Number of games to be played.
         :param max_steps: Maximum number of steps (to prevent the agent from cycling)
-        :param store_text: Only store text descriptions and not sequences, used for initializing tokenizer
-        :param step_cost: Penalty for every step without a reward (usually a small negative value (-0.01), default 0
+        :param initialize_only: Only store text descriptions and not sequences, used for initializing tokenizer
         :param store_experience: Whether to store new experiences for training while playing.
         :param epsilon: Probability of choosing a random action.
-        :param verbose: Whether to print states and actions.
-        :return: The average score across all episodes.
+        :return: The list of average rewards for all simulators across all episodes.
         """
-        total_reward = 0
 
-        for i in range(episodes):
+        rewards = []
 
-            steps = 0
-            experiences = []
+        for simulator in simulators:
 
-            self.reset_history()
+            # set the reference to the current simulator so that other methods called from here can access it too
+            self.simulator = simulator
 
-            (state, actions, reward) = self.simulator.read()
-            state = preprocess(state)
-            actions = [preprocess(a) for a in actions]
+            total_reward = 0
 
-            while len(actions) > 0 and steps <= max_steps:
+            for i in range(episodes):
 
-                action, q_value = self.act(state, actions, epsilon)
+                steps = 0
+                experiences = []
 
-                if verbose:
-                    logger.info('State: %s', state)
-                    logger.info('Best action: %s, q=%s', actions[action], q_value)
-
-                # only save to history if tokenizer is already initialized == not storing text data
-                if not store_text:
-                    self.add_to_history(self.vectorize([state])[0], self.vectorize([actions[action]])[0])
-
-                self.simulator.write(action)
-
-                last_state = state
-                last_action = actions[action]
+                self.reset_history()
 
                 (state, actions, reward) = self.simulator.read()
                 state = preprocess(state)
                 actions = [preprocess(a) for a in actions]
-                # if store_text:
-                #     print(actions)
-                # print(self.vectorize(actions))
-                finished = len(actions) < 1
 
-                if steps >= max_steps:
-                    logger.info('Maximum number of steps exceeded, last state: %s...', state[:64])
-                    # TODO - penalize?
-                    # reward -= 100
+                while len(actions) > 0 and steps <= self.simulator.max_steps:
 
-                # override reward from the environment in a non-terminal state by applying the step cost
-                # only if the environment didn't provide a step cost (MoD does, SJ doesn't)
-                if reward == 0 and not finished:
-                    reward = step_cost
+                    action, q_value = self.act(state, actions, epsilon)
 
-                # scale the reward from [-reward_scale, reward_scale] to [-1, 1]
-                reward /= reward_scale
+                    logger.debug('State: %s', state)
+                    logger.debug('Best action: %s, q=%s', actions[action], q_value)
 
-                if store_experience:
-                    experiences.append((last_state, last_action, reward, state, actions, finished))
+                    # only save to history if tokenizer is already initialized == not storing text data
+                    if not initialize_only:
+                        self.add_to_history(self.vectorize([state])[0], self.vectorize([actions[action]])[0])
 
-                total_reward += reward
-                steps += 1
+                    self.simulator.write(action)
 
-            # store only episodes that did not exceed max steps or if still getting tokens
-            if store_experience and (steps < max_steps or store_text):
-                for last_state, last_action, reward, state, actions, finished in experiences:
-                    self.store_experience(last_state, last_action, reward,
-                                          state, actions, finished, reward_scale, store_text)
+                    last_state = state
+                    last_action = actions[action]
 
-            self.reset()
+                    (state, actions, reward) = self.simulator.read()
+                    state = preprocess(state)
+                    actions = [preprocess(a) for a in actions]
 
-        if store_text:
-            logger.info('Successfully played %s game episodes, got %s new experiences.', episodes, len(self.experience))
+                    finished = len(actions) < 1
 
-        return total_reward * reward_scale / episodes
+                    if steps >= self.simulator.max_steps:
+                        logger.info('Maximum number of steps exceeded, last state: %s...', state[:64])
+                        # TODO - penalize?
+                        # reward -= 100
+
+                    # scale the reward from [-reward_scale, reward_scale] to [-1, 1]
+                    reward /= self.simulator.reward_scale
+
+                    if store_experience:
+                        experiences.append((last_state, last_action, reward, state, actions, finished))
+
+                    total_reward += reward
+                    steps += 1
+
+                # store only episodes that did not exceed max steps or if still getting tokens
+                if store_experience and (steps < self.simulator.max_steps or initialize_only):
+                    for last_state, last_action, reward, state, actions, finished in experiences:
+                        self.store_experience(last_state, last_action, reward,
+                                              state, actions, finished, initialize_only)
+
+                self.simulator.restart()
+
+            rewards.append(total_reward * self.simulator.reward_scale / episodes)
+
+        return rewards
 
     def experience_to_sequences(self, state, action, reward, state_next, actions_next, finished):
         """
@@ -390,7 +408,7 @@ class LSTMAgent(agent.Agent):
         return state_sequence, action_sequence, reward, state_next_sequence, actions_next_sequences, finished
 
     def store_experience(self, state_text, action_text, reward, state_next_text, actions_next_texts, finished,
-                         reward_scale=1, store_text_only=False):
+                         store_text_only=False):
 
         # storing the text version of experience is only necessary prior to fitting the tokenizer
         if store_text_only:
@@ -416,30 +434,27 @@ class LSTMAgent(agent.Agent):
             self.prioritized_experiences_queue.append(experience)
             logger.info('New unique positive experience - total {}.\nReward: {:.1f}, state: {}...'.format(
                 len(self.prioritized_experiences_queue),
-                reward * reward_scale,
+                reward * self.simulator.reward_scale,
                 state_next_text[:64]))
 
-    def train_online(self, max_steps, episodes=256, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.99,
-                     prioritized_fraction=0, reward_scale=1, step_cost=-0.1, test_interval=1, test_steps=1,
-                     checkpoint_steps=64):
+    def train_online(self, episodes=256, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.99,
+                     prioritized_fraction=0, test_interval=1, test_steps=1, checkpoint_steps=64):
         """
         Trains the model while playing at the same time
         :param test_steps:
         :param checkpoint_steps:
-        :param reward_scale:
         :param test_interval: test the agent after each N steps (batches)
         :param epsilon_decay: 
         :param epsilon: 
-        :param step_cost: 
-        :param episodes: 
-        :param max_steps: 
+        :param episodes:
         :param batch_size: number of experiences to be used for training (each is used once)
         :param gamma: discount factor (higher gamma ~ taking future into account more)
         :param prioritized_fraction: only sample prioritized experience (final states with higher reward values)
-        :return: rewards
+        :return:
         """
 
-        rewards = []
+        train_rewards_history = []
+        test_rewards_history = []
 
         # batch_prioritized is the number of prioritized samples to get
         batch_prioritized = int(batch_size * prioritized_fraction)
@@ -448,19 +463,21 @@ class LSTMAgent(agent.Agent):
 
         for i in range(episodes):
 
+            # Train
             # Let the agent sample and store game data with the given epsilon (usually decreasing over time)
-            reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=True,
-                                    epsilon=epsilon, reward_scale=reward_scale)
+            train_rewards = self.play_game(episodes=1, store_experience=True, epsilon=epsilon,
+                                           simulators=self.train_simulators)
+            train_rewards_history.append(train_rewards)
 
             logger.info('\n------------------------------------------\nEpisode {}, epsilon = {:.4f}'.format(i, epsilon))
-            logger.info('Train reward: {:.1f}'.format(reward))
+            logger.info('Train rewards: {:.1f}'.format(train_rewards))
 
-            # Test the agent after each N batches of weight updates
+            # Test the agent after each test_steps episodes
             if ((i + 1) % test_interval) == 0:
-                reward = self.play_game(max_steps=max_steps, episodes=test_steps, step_cost=step_cost,
-                                        store_experience=False, epsilon=0, reward_scale=reward_scale)
-                rewards.append(reward)
-                logger.info('Test reward: {:.1f}'.format(reward))
+                test_rewards = self.play_game(episodes=test_steps, store_experience=False, epsilon=0,
+                                              simulators=self.test_simulators)
+                test_rewards_history.append(test_rewards)
+                logger.info('Test reward: {:.1f}'.format(test_rewards))
 
             if len(self.experience) < 1:
                 return
@@ -523,15 +540,27 @@ class LSTMAgent(agent.Agent):
 
             epsilon *= epsilon_decay
 
+            # every checkpoint_steps, write down train and test reward history and the model object
             if ((i + 1) % checkpoint_steps) == 0:
 
-                file_name = 'Ep' + str(i) + '_' + datetime.datetime.now().strftime('%m-%d-%H_%M_%S')
-                with open('logs/' + file_name + '.txt', 'w') as file:
-                    for reward in rewards:
-                        file.write(str(reward) + '\n')
+                file_name = 'ep' + str(i) + '_' + datetime.datetime.now().strftime('%m-%d-%H_%M_%S')
+
+                with open('logs/train_' + file_name + '.txt', 'w') as file:
+                    for rewards in train_rewards_history:
+                        for reward in rewards:
+                            file.write(str(reward) + ' ')
+                        file.write('\n')
+
+                with open('logs/test_' + file_name + '.txt', 'w') as file:
+                    for rewards in test_rewards_history:
+                        for reward in rewards:
+                            file.write(str(reward) + ' ')
+                        file.write('\n')
+
+                # save the model
                 self.model.save('logs/' + file_name + '.h5')
 
-        return rewards
+        return
 
     def q_precomputed_state(self, state, actions, softmax_selection=False, penalize_history=False):
         """
@@ -613,145 +642,145 @@ class LSTMAgent(agent.Agent):
         self.state_action_history = {}
 
 
-    # offline and per-trace training have not been updated since possibly breaking changes in the agent class
-    # TODO test and readd these
-    # def train_traces(self, max_steps, episodes=256, batch_size=64, gamma=0.99, epsilon=1,
-    #                  epsilon_decay=0.995, reward_scale=1, step_cost=-0.1, test_steps=1):
-    #     """
-    #     Trains the model while playing at the same time
-    #     :param reward_scale:
-    #     :param test_steps: test the agent after each N steps (batches)
-    #     :param epsilon_decay:
-    #     :param epsilon:
-    #     :param step_cost:
-    #     :param episodes:
-    #     :param max_steps:
-    #     :param batch_size: number of experiences to be used for training (each is used once)
-    #     :param gamma:
-    #     :return: rewards
-    #     """
-    #
-    #     rewards = []
-    #
-    #     for i in range(episodes):
-    #
-    #         # clear the experience buffer
-    #         self.experience = []
-    #
-    #         # save one trace into the buffer
-    #         reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=True,
-    #                                 epsilon=epsilon, reward_scale=reward_scale)
-    #
-    #         logger.info('Episode %s, epsilon = %s, Train reward: %s', i, epsilon, reward)
-    #
-    #         # Test the agent after each N batches of weight updates
-    #         if i == 0 or ((i + 1) % test_steps) == 0:
-    #             reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=False,
-    #                                     epsilon=0, reward_scale=reward_scale)
-    #             rewards.append(reward)
-    #             logger.info('Test reward: %s', reward)
-    #
-    #         last_trace = self.experience
-    #
-    #         trace_length = len(last_trace)
-    #         if trace_length < 1:
-    #             logger.warning('No trace available or empty trace sampled, skipping episode %s', i)
-    #             continue
-    #
-    #         states = [None] * trace_length
-    #         actions = [None] * trace_length
-    #         targets = np.zeros((trace_length, 1))
-    #
-    #         final_reward = None
-    #
-    #         j = 0
-    #         reward_decay = 1
-    #         for state, action, reward, _, _, _ in reversed(last_trace):
-    #             if not final_reward:
-    #                 final_reward = reward
-    #                 target = reward
-    #             else:
-    #                 # TODO - adaptive scaling?
-    #                 # TODO target = reward + final_reward * reward_decay (* epsilon)? or combine with a q-step
-    #                 target = reward + final_reward * reward_decay
-    #
-    #             # if not finished:
-    #             # get an action with maximum Q value
-    #             # q_max = -np.math.inf
-    #             # for action_next in actions_next:
-    #             #     q = self.q(state_next, action_next)
-    #             #     if q > q_max:
-    #             #         q_max = q
-    #             # target += gamma * q_max
-    #
-    #             states[j] = state
-    #             actions[j] = action
-    #             targets[j] = target
-    #
-    #             reward_decay *= gamma
-    #             j += 1
-    #
-    #         # pad the states and actions so that each sample in this batch has the same size
-    #         states = pad_sequences(states)
-    #         actions = pad_sequences(actions)
-    #
-    #         logger.debug('states %s', states)
-    #         logger.debug('actions %s', actions)
-    #         logger.debug('targets %s', targets)
-    #
-    #         self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1,
-    #                        callbacks=[self.tensorboard])
-    #
-    #         epsilon *= epsilon_decay
-    #
-    #     return rewards
+        # offline and per-trace training have not been updated since possibly breaking changes in the agent class
+        # TODO test and readd these
+        # def train_traces(self, max_steps, episodes=256, batch_size=64, gamma=0.99, epsilon=1,
+        #                  epsilon_decay=0.995, reward_scale=1, step_cost=-0.1, test_steps=1):
+        #     """
+        #     Trains the model while playing at the same time
+        #     :param reward_scale:
+        #     :param test_steps: test the agent after each N steps (batches)
+        #     :param epsilon_decay:
+        #     :param epsilon:
+        #     :param step_cost:
+        #     :param episodes:
+        #     :param max_steps:
+        #     :param batch_size: number of experiences to be used for training (each is used once)
+        #     :param gamma:
+        #     :return: rewards
+        #     """
+        #
+        #     rewards = []
+        #
+        #     for i in range(episodes):
+        #
+        #         # clear the experience buffer
+        #         self.experience = []
+        #
+        #         # save one trace into the buffer
+        #         reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=True,
+        #                                 epsilon=epsilon, reward_scale=reward_scale)
+        #
+        #         logger.info('Episode %s, epsilon = %s, Train reward: %s', i, epsilon, reward)
+        #
+        #         # Test the agent after each N batches of weight updates
+        #         if i == 0 or ((i + 1) % test_steps) == 0:
+        #             reward = self.play_game(max_steps=max_steps, episodes=1, step_cost=step_cost, store_experience=False,
+        #                                     epsilon=0, reward_scale=reward_scale)
+        #             rewards.append(reward)
+        #             logger.info('Test reward: %s', reward)
+        #
+        #         last_trace = self.experience
+        #
+        #         trace_length = len(last_trace)
+        #         if trace_length < 1:
+        #             logger.warning('No trace available or empty trace sampled, skipping episode %s', i)
+        #             continue
+        #
+        #         states = [None] * trace_length
+        #         actions = [None] * trace_length
+        #         targets = np.zeros((trace_length, 1))
+        #
+        #         final_reward = None
+        #
+        #         j = 0
+        #         reward_decay = 1
+        #         for state, action, reward, _, _, _ in reversed(last_trace):
+        #             if not final_reward:
+        #                 final_reward = reward
+        #                 target = reward
+        #             else:
+        #                 # TODO - adaptive scaling?
+        #                 # TODO target = reward + final_reward * reward_decay (* epsilon)? or combine with a q-step
+        #                 target = reward + final_reward * reward_decay
+        #
+        #             # if not finished:
+        #             # get an action with maximum Q value
+        #             # q_max = -np.math.inf
+        #             # for action_next in actions_next:
+        #             #     q = self.q(state_next, action_next)
+        #             #     if q > q_max:
+        #             #         q_max = q
+        #             # target += gamma * q_max
+        #
+        #             states[j] = state
+        #             actions[j] = action
+        #             targets[j] = target
+        #
+        #             reward_decay *= gamma
+        #             j += 1
+        #
+        #         # pad the states and actions so that each sample in this batch has the same size
+        #         states = pad_sequences(states)
+        #         actions = pad_sequences(actions)
+        #
+        #         logger.debug('states %s', states)
+        #         logger.debug('actions %s', actions)
+        #         logger.debug('targets %s', targets)
+        #
+        #         self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1,
+        #                        callbacks=[self.tensorboard])
+        #
+        #         epsilon *= epsilon_decay
+        #
+        #     return rewards
 
-    # def train_offline(self, episodes=1, batch_size=32, gamma=0.99, prioritized=False):
-    #     """
-    #     Picks random experiences and trains the model on them
-    #     :param episodes: number of episodes, in each episode we train batch_size examples
-    #     :param batch_size: number of experiences to be used for training (each is used once in an episode)
-    #     :param gamma: discount factor (higher gamma ~ taking future into account more)
-    #     :param prioritized: only sample prioritized experiences (final states with usually higher reward values)
-    #     :return:
-    #     """
-    #
-    #     source = self.experience
-    #
-    #     if prioritized:
-    #         source = self.experience_prioritized
-    #         logger.debug('Sampling prioritized only, %s from %s', batch_size, len(source))
-    #
-    #     if len(source) < 1:
-    #         logger.warning('No samples for training available.')
-    #         return
-    #
-    #     for x in range(episodes):
-    #
-    #         batches = np.random.choice(len(source), batch_size)
-    #
-    #         states = [None] * batch_size
-    #         actions = [None] * batch_size
-    #         targets = np.zeros((batch_size, 1))
-    #
-    #         for i in range(batch_size):
-    #             state, action, reward, state_next, actions_next, finished = source[batches[i]]
-    #             target = reward
-    #
-    #             if not finished:
-    #                 # get an action with maximum Q value
-    #                 q_max = -np.math.inf
-    #                 for action_next in actions_next:
-    #                     q = self.q(state_next, action_next)
-    #                     if q > q_max:
-    #                         q_max = q
-    #                 target += gamma * q_max
-    #
-    #             states[i] = state
-    #             actions[i] = action
-    #             targets[i] = target
-    #
-    #         states = pad_sequences(states)
-    #         actions = pad_sequences(actions)
-    #
-    #         self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)
+        # def train_offline(self, episodes=1, batch_size=32, gamma=0.99, prioritized=False):
+        #     """
+        #     Picks random experiences and trains the model on them
+        #     :param episodes: number of episodes, in each episode we train batch_size examples
+        #     :param batch_size: number of experiences to be used for training (each is used once in an episode)
+        #     :param gamma: discount factor (higher gamma ~ taking future into account more)
+        #     :param prioritized: only sample prioritized experiences (final states with usually higher reward values)
+        #     :return:
+        #     """
+        #
+        #     source = self.experience
+        #
+        #     if prioritized:
+        #         source = self.experience_prioritized
+        #         logger.debug('Sampling prioritized only, %s from %s', batch_size, len(source))
+        #
+        #     if len(source) < 1:
+        #         logger.warning('No samples for training available.')
+        #         return
+        #
+        #     for x in range(episodes):
+        #
+        #         batches = np.random.choice(len(source), batch_size)
+        #
+        #         states = [None] * batch_size
+        #         actions = [None] * batch_size
+        #         targets = np.zeros((batch_size, 1))
+        #
+        #         for i in range(batch_size):
+        #             state, action, reward, state_next, actions_next, finished = source[batches[i]]
+        #             target = reward
+        #
+        #             if not finished:
+        #                 # get an action with maximum Q value
+        #                 q_max = -np.math.inf
+        #                 for action_next in actions_next:
+        #                     q = self.q(state_next, action_next)
+        #                     if q > q_max:
+        #                         q_max = q
+        #                 target += gamma * q_max
+        #
+        #             states[i] = state
+        #             actions[i] = action
+        #             targets[i] = target
+        #
+        #         states = pad_sequences(states)
+        #         actions = pad_sequences(actions)
+        #
+        #         self.model.fit(x=[states, actions], y=targets, batch_size=batch_size, epochs=1, verbose=1)

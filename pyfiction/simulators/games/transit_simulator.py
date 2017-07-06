@@ -1,16 +1,20 @@
 import random
 
-import time
-
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions
-from selenium.webdriver.support.wait import WebDriverWait
-
 from pyfiction.games.Transit.transit import Transit
 from pyfiction.simulators.html_simulator import HTMLSimulator
 
 
 class TransitSimulator(HTMLSimulator):
+    # the maximum number of steps the agent should take before we interrupt him to break infinite cycles
+    max_steps = 100
+
+    # the recommended number of random game walkthroughs for vocabulary initialization
+    # should ideally cover all possible states and used words
+    initialization_iterations = 256
+
+    # if the game rewards are in e.g. [-30, 30], set the reward scale to 30 so that the result is in [-1, 1]
+    reward_scale = 20
+
     def __init__(self, shuffle=True):
         super().__init__(Transit, shuffle=shuffle)
 
@@ -54,7 +58,6 @@ class TransitSimulator(HTMLSimulator):
             print('WARNING: Transit simulator removed all actions because of a game bug! Ending with a 0 reward.')
             return '', [], 0
 
-
         if not self.actions:
             ending = text.lower()
 
@@ -91,11 +94,6 @@ class TransitSimulator(HTMLSimulator):
             else:
                 raise Exception('Game ended and no actions left but an unknown ending reached, cannot assign reward: ',
                                 ending)
-                # print('Game ended and no actions left but an unknown ending reached, cannot assign reward: ',
-                #       ending)
-                # pass
-
-
 
         elif self.shuffle:
             random.shuffle(self.actions)
@@ -128,8 +126,6 @@ if __name__ == '__main__':
 
             action = random.randint(0, len(actions) - 1)
             simulator.write(action)
-
-            # time.sleep(0.1)
 
         simulator.restart()
 

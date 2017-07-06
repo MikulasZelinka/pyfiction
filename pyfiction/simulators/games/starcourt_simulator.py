@@ -5,6 +5,17 @@ from pyfiction.simulators.html_simulator import HTMLSimulator
 
 
 class StarCourtSimulator(HTMLSimulator):
+
+    # the maximum number of steps the agent should take before we interrupt him to break infinite cycles
+    max_steps = 500
+
+    # the recommended number of random game walkthroughs for vocabulary initialization
+    # should ideally cover all possible states and used words
+    initialization_iterations = 1024
+
+    # if the game rewards are in e.g. [-30, 30], set the reward scale to 30 so that the result is in [-1, 1]
+    reward_scale = 30
+
     def __init__(self, shuffle=True):
         super().__init__(StarCourt, shuffle=shuffle)
         self.actions = None

@@ -13,10 +13,10 @@ An example agent for Machine of Death that uses online learning and prioritized 
 """
 
 # Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(simulator=MachineOfDeathSimulator)
+agent = LSTMAgent(train_simulators=MachineOfDeathSimulator)
 
 # Learn the vocabulary (the function samples the game using a random policy)
-agent.initialize_tokens(iterations=2**13, max_steps=500)
+agent.initialize_tokens(iterations=2 ** 13, max_steps=500)
 
 optimizer = RMSprop(lr=0.0005)
 
@@ -40,9 +40,8 @@ except ImportError as e:
 epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    rewards = agent.train_online(episodes=256*256, max_steps=500, batch_size=256, gamma=0.95, epsilon=1,
-                                 epsilon_decay=0.999, reward_scale=30, prioritized_fraction=0.25, test_interval=4,
-                                 test_steps=4)
+    agent.train_online(episodes=256 * 256, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.999,
+                       prioritized_fraction=0.25, test_interval=4, test_steps=4)
 
 # Test on paraphrased actions
 # agent.simulator = MachineOfDeathSimulator(paraphrase_actions=True)

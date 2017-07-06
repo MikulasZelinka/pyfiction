@@ -8,6 +8,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 """
+THIS EXAMPLE IS CURRENTLY OBSOLETE (breaking changes to the LSTMAgent class were introduces)
 An example agent for Saving John that uses offline learning and prioritized sampling
 The samples are obtained using a random policy, meaning this method is only suitable for games where a random policy
  samples the states evenly

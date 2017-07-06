@@ -4,7 +4,6 @@ from pyfiction.simulators.simulator import Simulator
 
 
 class HTMLSimulator(Simulator):
-
     def __init__(self, game, shuffle=True):
         self.driver = webdriver.Chrome()
         self.game = game
@@ -13,7 +12,6 @@ class HTMLSimulator(Simulator):
 
     def restart(self):
         self.driver.get('file:///' + self.game.path)
-
 
     def startup_actions(self):
         for action in self.game.startup_actions:
@@ -25,4 +23,3 @@ class HTMLSimulator(Simulator):
 
     def read(self):
         pass
-
