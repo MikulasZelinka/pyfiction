@@ -18,7 +18,7 @@ agent = LSTMAgent(train_simulators=MachineOfDeathSimulator())
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens()
 
-optimizer = RMSprop(lr=0.0005)
+optimizer = RMSprop(lr=0.00001)
 
 embedding_dimensions = 16
 lstm_dimensions = 32
@@ -36,12 +36,12 @@ except ImportError as e:
     logger.warning("Couldn't print the model image: {}".format(e))
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
-# This example seems to converge to nearly optimal rewards in two out of three game branches
+# This example seems to converge to nearly optimal rewards in all three game branches
 epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
     agent.train_online(episodes=256 * 256, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.999,
-                       prioritized_fraction=0.25, test_interval=4, test_steps=4)
+                       prioritized_fraction=0.25, test_interval=16, test_steps=5)
 
 
 # Test on paraphrased actions

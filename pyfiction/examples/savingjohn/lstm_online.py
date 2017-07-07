@@ -19,7 +19,7 @@ agent = LSTMAgent(train_simulators=SavingJohnSimulator())
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens()
 
-optimizer = RMSprop(lr=0.0005)
+optimizer = RMSprop(lr=0.001)
 
 embedding_dimensions = 16
 lstm_dimensions = 32
@@ -37,7 +37,7 @@ except ImportError as e:
     logger.warning("Couldn't print the model image: {}".format(e))
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
-# This example seems to converge to a reward of 19.X (with 19.4 being the optimal reward)
+# This example seems to converge to a reward of 19.3+ (with 19.4 being the optimal reward)
 epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
