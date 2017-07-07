@@ -263,7 +263,7 @@ class LSTMAgent(agent.Agent):
         logger.info('Initializing tokens by playing the game randomly with all train and test simulators')
 
         for simulator in list(set(self.train_simulators + self.test_simulators)):
-            logger.info('Playing %s randomly %s times', simulator, simulator.initialization_iterations)
+            logger.info('Playing %s randomly %s times', simulator.game.name, simulator.initialization_iterations)
 
             # Temporarily store all experience and use it to get the tokens, use each simulator once
             self.play_game(episodes=simulator.initialization_iterations, store_experience=True, initialize_only=True,

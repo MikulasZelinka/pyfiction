@@ -1,3 +1,4 @@
+from pyfiction.games.SavingJohn.saving_john import SavingJohn
 from pyfiction.simulators.simulator import Simulator
 from pyfiction.simulators.text_games.simulators.MySimulator import SavingJohnSimulator as SJS
 
@@ -26,6 +27,7 @@ class SavingJohnSimulator(Simulator):
         self.simulator.Restart()
 
     def __init__(self, shuffle_actions=True):
+        self.game = SavingJohn
         self.simulator = SJS(shuffle_actions)
 
     def read(self, **kwargs):

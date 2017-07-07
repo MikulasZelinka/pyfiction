@@ -10,6 +10,9 @@ class Simulator:
     # if the game rewards are in e.g. [-30, 30], set the reward scale to 30 so that the result is in [-1, 1]
     reward_scale = 1
 
+    # reference to the underlying game class
+    game = None
+
     def __init__(self):
         raise NotImplementedError("Game is an abstract class.")
 

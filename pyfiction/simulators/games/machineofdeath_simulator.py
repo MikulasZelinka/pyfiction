@@ -1,5 +1,6 @@
 import re
 
+from pyfiction.games.MachineOfDeath.machine_of_death import MachineOfDeath
 from pyfiction.simulators.simulator import Simulator
 from pyfiction.simulators.text_games.simulators.MySimulator import MachineOfDeathSimulator as MODS
 
@@ -28,6 +29,7 @@ class MachineOfDeathSimulator(Simulator):
         self.simulator.Restart()
 
     def __init__(self, shuffle_actions=True, paraphrase_actions=False):
+        self.game = MachineOfDeath
         self.simulator = MODS(shuffle_actions, doParaphrase=paraphrase_actions)
 
     def read(self, **kwargs):

@@ -105,6 +105,8 @@ class StarCourtSimulator(HTMLSimulator):
             # dead and guilty
             elif "The knife hits you right between the eyes. You are killed immediately, and, what's worse, you're found guilty by the court!" in ending:
                 reward = -30
+            elif "You're totally wrecked! I guess this means you're guilty!" in ending:
+                reward = -30
 
 
 
