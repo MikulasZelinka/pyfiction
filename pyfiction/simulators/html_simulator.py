@@ -7,7 +7,13 @@ class HTMLSimulator(Simulator):
     def __init__(self, game, shuffle=True):
         self.game = game
         self.shuffle = shuffle
-        self.driver = webdriver.Chrome()
+
+        # use a headless Chromium/Chrome browser
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_argument("headless")
+        chrome_options.add_argument("disable-gpu")
+        self.driver = webdriver.Chrome(chrome_options=chrome_options)
+
         self.driver.get('file:///' + self.game.path)
 
     def restart(self):
