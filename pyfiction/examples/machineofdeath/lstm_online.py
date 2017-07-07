@@ -12,8 +12,10 @@ logger = logging.getLogger(__name__)
 An example agent for Machine of Death that uses online learning and prioritized sampling
 """
 
+simulator = MachineOfDeathSimulator(paraphrase_actions=False)
+simulator_paraphrased = MachineOfDeathSimulator(paraphrase_actions=True)
 # Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(train_simulators=MachineOfDeathSimulator())
+agent = LSTMAgent(train_simulators=simulator, test_simulators=[simulator, simulator_paraphrased])
 
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens('vocabulary.txt')
@@ -40,22 +42,15 @@ except ImportError as e:
 epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    agent.train_online(episodes=256 * 256, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.999,
-                       prioritized_fraction=0.25, test_interval=16, test_steps=5)
+    agent.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon_decay=0.999,
+                       prioritized_fraction=0.25, test_interval=8, test_steps=5)
 
-
-# Test on paraphrased actions
-test_simulator = MachineOfDeathSimulator(paraphrase_actions=True)
 
 # optionally load the model if not directly continuing after learning on non-paraphrased actions:
 # agent.model = load_model('logs/Epoch3_06-14-05_29_25.h5')
 
-# First test performance directly without any learning:
-episodes = 256
-for i in range(episodes):
-    agent.play_game(episodes=8, store_experience=False, epsilon=0, simulators=[test_simulator])
-
 # Transfer learning on paraphrased actions with the original vocabulary and not freezing any layers:
 agent.clear_experience()
-agent.train_simulators = [test_simulator]
-agent.train_online(episodes=256, epsilon=0.1, prioritized_fraction=0.25, test_steps=4)
+agent.train_simulators = [simulator_paraphrased]
+agent.train_online(episodes=1024, batch_size=256, gamma=0.95, epsilon=0.5, epsilon_decay=0.99,
+                   prioritized_fraction=0.25, test_steps=5)

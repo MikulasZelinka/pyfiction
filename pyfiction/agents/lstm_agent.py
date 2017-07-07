@@ -475,9 +475,10 @@ class LSTMAgent(agent.Agent):
                 state_next_text[:64]))
 
     def train_online(self, episodes=256, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.99,
-                     prioritized_fraction=0, test_interval=1, test_steps=1, checkpoint_steps=64):
+                     prioritized_fraction=0, test_interval=1, test_steps=1, checkpoint_steps=128, log_prefix=''):
         """
         Trains the model while playing at the same time
+        :param log_prefix:
         :param test_steps:
         :param checkpoint_steps:
         :param test_interval: test the agent after each N steps (batches)
@@ -591,7 +592,7 @@ class LSTMAgent(agent.Agent):
 
                 file_name = 'ep' + str(i) + '_' + datetime.datetime.now().strftime('%m-%d-%H_%M_%S')
 
-                with open('logs/train_' + file_name + '.txt', 'w') as file:
+                with open('logs/' + log_prefix + '_train_' + file_name + '.txt', 'w') as file:
                     for simulator_rewards in train_rewards_history:
                         for rewards in simulator_rewards:
                             for reward in rewards:
@@ -599,7 +600,7 @@ class LSTMAgent(agent.Agent):
                             file.write(',')
                         file.write('\n')
 
-                with open('logs/test_' + file_name + '.txt', 'w') as file:
+                with open('logs/' + log_prefix + '_test_' + file_name + '.txt', 'w') as file:
                     for simulator_rewards in test_rewards_history:
                         for rewards in simulator_rewards:
                             for reward in rewards:
@@ -608,7 +609,7 @@ class LSTMAgent(agent.Agent):
                         file.write('\n')
 
                 # save the model
-                self.model.save('logs/' + file_name + '.h5')
+                self.model.save('logs/' + log_prefix + file_name + '.h5')
 
         return
 

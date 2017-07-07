@@ -19,7 +19,7 @@ agent = LSTMAgent(train_simulators=SavingJohnSimulator())
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens('vocabulary.txt')
 
-optimizer = RMSprop(lr=0.001)
+optimizer = RMSprop(lr=0.0001)
 
 embedding_dimensions = 16
 lstm_dimensions = 32
@@ -41,10 +41,9 @@ except ImportError as e:
 epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    agent.train_online(episodes=128, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.99,
-                       prioritized_fraction=0.25, test_interval=1, test_steps=1)
+    agent.train_online(episodes=256, batch_size=64, gamma=0.95, epsilon_decay=0.99, prioritized_fraction=0.25)
 
     # inspect model weights:
-    for layer in agent.model.layers:
-        print('layer', layer.name)
-        print(layer.get_weights())
+    # for layer in agent.model.layers:
+    #     print('layer', layer.name)
+    #     print(layer.get_weights())

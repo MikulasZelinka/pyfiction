@@ -1,3 +1,4 @@
+import argparse
 import logging
 
 from keras.optimizers import RMSprop
@@ -15,20 +16,39 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 """
-An example agent for Machine of Death that uses online learning and prioritized sampling
+An LSTM agent that supports leave-one-out generalisation testing
 """
 
 simulators = [CatSimulator2016Simulator(),
               MachineOfDeathSimulator(),
               SavingJohnSimulator(),
-              # StarCourtSimulator(),
+              StarCourtSimulator(),
               TheRedHairSimulator(),
               TransitSimulator()]
 
-# Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(train_simulators=simulators)
+parser = argparse.ArgumentParser()
+parser.add_argument('--simulator',
+                    help='index of a simulator to use for leave-one-out testing [1-6], 0 for training and testing all',
+                    type=int,
+                    default=0)
 
-# Learn the vocabulary (the function samples the game using a random policy)
+args = parser.parse_args()
+simulator_index = args.simulator
+
+if simulator_index == 0:
+    train_simulators = simulators
+    test_simulators = simulators
+    print('Training and testing on all games:', [simulator.game.name for simulator in simulators])
+else:
+    train_simulators = simulators[:simulator_index - 1] + simulators[simulator_index:]
+    test_simulators = simulators[simulator_index - 1]
+    print('Training on games:', [simulator.game.name for simulator in train_simulators])
+    print('Testing on game:', test_simulators.game.name)
+
+# Create the agent and specify maximum lengths of descriptions (in words)
+agent = LSTMAgent(train_simulators=train_simulators, test_simulators=test_simulators)
+
+# Load or learn the vocabulary (random sampling on this many games could be extremely slow)
 agent.initialize_tokens('vocabulary.txt')
 
 optimizer = RMSprop(lr=0.00001)
@@ -49,9 +69,16 @@ except ImportError as e:
     logger.warning("Couldn't print the model image: {}".format(e))
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
-# This example seems to converge to nearly optimal rewards in all three game branches
-epochs = 0
+# This example seems to ...
+epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    agent.train_online(episodes=256 * 256, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.999,
-                       prioritized_fraction=0.25, test_interval=16, test_steps=5)
+    agent.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.999,
+                       prioritized_fraction=0.25, test_interval=16, test_steps=5, log_prefix=str(simulator_index))
+
+# train the agent on the tested game
+if simulator_index != 0:
+    agent.clear_experience()
+    agent.train_simulators = test_simulators
+    agent.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.999,
+                       prioritized_fraction=0.25, test_interval=16, test_steps=5, log_prefix=str(simulator_index))

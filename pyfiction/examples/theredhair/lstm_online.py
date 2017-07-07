@@ -3,17 +3,17 @@ import logging
 from keras.optimizers import RMSprop
 from keras.utils import plot_model
 from pyfiction.agents.lstm_agent import LSTMAgent
-from pyfiction.simulators.games.starcourt_simulator import StarCourtSimulator
+from pyfiction.simulators.games.theredhair_simulator import TheRedHairSimulator
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 """
-An example agent for Star Court that uses online learning and prioritized sampling
+An example agent for The Red Hair that uses online learning and prioritized sampling
 """
 
 # Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(train_simulators=StarCourtSimulator())
+agent = LSTMAgent(train_simulators=TheRedHairSimulator())
 
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens('vocabulary.txt')
@@ -40,5 +40,4 @@ except ImportError as e:
 epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    agent.train_online(episodes=256 * 256, batch_size=256, gamma=0.95, epsilon_decay=0.999,
-                       prioritized_fraction=0.25, test_interval=8, test_steps=5)
+    agent.train_online(episodes=128, batch_size=64, gamma=0.95, epsilon_decay=0.99, prioritized_fraction=0.25)
