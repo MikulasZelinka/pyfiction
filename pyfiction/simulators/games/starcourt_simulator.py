@@ -1,5 +1,8 @@
 import random
 
+import time
+from selenium.common.exceptions import StaleElementReferenceException
+
 from pyfiction.games.StarCourt.star_court import StarCourt
 from pyfiction.simulators.html_simulator import HTMLSimulator
 
@@ -31,7 +34,12 @@ class StarCourtSimulator(HTMLSimulator):
 
         # text is always in the the tw-story html tag:
         passage = self.driver.find_element_by_class_name("passage")
-        text = passage.text
+        try:
+            text = passage.text
+        except StaleElementReferenceException as e:
+            print('WARNING:', self.game.name, ' stale element reference exception:', e)
+            time.sleep(0.1)
+            text = (self.driver.find_element_by_class_name("passage")).text
 
         # self.actions = [(action.text, action) for action in passage.find_elements_by_class_name("internalLink")]
         self.actions = [(action.text, action) for action in passage.find_elements_by_tag_name("a")]
@@ -66,9 +74,6 @@ class StarCourtSimulator(HTMLSimulator):
             elif ending.startswith('Immediately upon starting the battle, the titanic creature falls asleep!'):
                 reward = -30
             # death sentence by trial (literally)
-            elif ending.startswith('You burn in the creature\'s four fiery mouths!'):
-                reward = -30
-            # death sentence by trial (literally)
             elif ending.startswith('You are torn limb from limb by the many-limbed creature!'):
                 reward = -30
             # "blasting you right in the core"
@@ -87,6 +92,9 @@ class StarCourtSimulator(HTMLSimulator):
                 years = int(words[words.index('years') - 1])
                 reward = -years / 100
 
+            # one of the many endings of guilt and death
+            elif "You're dead! I guess that means you're guilty!" in ending:
+                reward = -30
             # dead but not guilty
             elif 'You are neither guilty nor innocent, as law has been dethroned in the universe. However, you have died in a fire.' in ending:
                 reward = -20
@@ -105,7 +113,8 @@ class StarCourtSimulator(HTMLSimulator):
             # dead and guilty
             elif "The knife hits you right between the eyes. You are killed immediately, and, what's worse, you're found guilty by the court!" in ending:
                 reward = -30
-            elif "You're totally wrecked! I guess this means you're guilty!" in ending:
+            # dead and guilty
+            elif "means you're guilty!" in ending:
                 reward = -30
 
 
