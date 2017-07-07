@@ -335,7 +335,7 @@ class LSTMAgent(agent.Agent):
             # set the reference to the current simulator so that other methods called from here can access it too
             self.simulator = simulator
 
-            total_reward = 0
+            simulator_rewards = []
 
             for i in range(episodes):
 
@@ -347,6 +347,8 @@ class LSTMAgent(agent.Agent):
                 (state, actions, reward) = self.simulator.read()
                 state = preprocess(state)
                 actions = [preprocess(a) for a in actions]
+
+                episode_reward = 0
 
                 while len(actions) > 0 and steps <= self.simulator.max_steps:
 
@@ -381,7 +383,7 @@ class LSTMAgent(agent.Agent):
                     if store_experience:
                         experiences.append((last_state, last_action, reward, state, actions, finished))
 
-                    total_reward += reward
+                    episode_reward += reward
                     steps += 1
 
                 # store only episodes that did not exceed max steps or if still getting tokens
@@ -390,9 +392,10 @@ class LSTMAgent(agent.Agent):
                         self.store_experience(last_state, last_action, reward,
                                               state, actions, finished, initialize_only)
 
+                simulator_rewards.append(episode_reward * self.simulator.reward_scale)
                 self.simulator.restart()
 
-            rewards.append(total_reward * self.simulator.reward_scale / episodes)
+            rewards.append(simulator_rewards)
 
         return rewards
 
@@ -479,7 +482,11 @@ class LSTMAgent(agent.Agent):
                                            simulators=self.train_simulators)
             train_rewards_history.append(train_rewards)
             logger.info(
-                "Train rewards: " + " ".join(str(x) for x in ['{:.1f}'.format(reward) for reward in train_rewards]))
+                "Train rewards: " +
+                ", ".join(
+                    " ".join(x for x in ['{:.1f}'.format(reward) for reward in simulator_rewards])
+                    for simulator_rewards in train_rewards)
+            )
 
             # Test the agent after each test_steps episodes with a zero epsilon
             if ((i + 1) % test_interval) == 0:
@@ -487,7 +494,11 @@ class LSTMAgent(agent.Agent):
                                               simulators=self.test_simulators)
                 test_rewards_history.append(test_rewards)
                 logger.info(
-                    "Test rewards: " + " ".join(str(x) for x in ['{:.1f}'.format(reward) for reward in test_rewards]))
+                    "Test rewards: " +
+                    ", ".join(
+                        " ".join(x for x in ['{:.1f}'.format(reward) for reward in simulator_rewards])
+                        for simulator_rewards in test_rewards)
+                )
 
             if len(self.experience) < 1:
                 return
@@ -556,15 +567,19 @@ class LSTMAgent(agent.Agent):
                 file_name = 'ep' + str(i) + '_' + datetime.datetime.now().strftime('%m-%d-%H_%M_%S')
 
                 with open('logs/train_' + file_name + '.txt', 'w') as file:
-                    for rewards in train_rewards_history:
-                        for reward in rewards:
-                            file.write(str(reward) + ' ')
+                    for simulator_rewards in train_rewards_history:
+                        for rewards in simulator_rewards:
+                            for reward in rewards:
+                                file.write('{:.1f}'.format(reward) + ' ')
+                            file.write(',')
                         file.write('\n')
 
                 with open('logs/test_' + file_name + '.txt', 'w') as file:
-                    for rewards in test_rewards_history:
-                        for reward in rewards:
-                            file.write(str(reward) + ' ')
+                    for simulator_rewards in test_rewards_history:
+                        for rewards in simulator_rewards:
+                            for reward in rewards:
+                                file.write('{:.1f}'.format(reward) + ' ')
+                            file.write(',')
                         file.write('\n')
 
                 # save the model
