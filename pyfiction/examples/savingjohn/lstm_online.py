@@ -17,7 +17,7 @@ An example agent for Saving John that uses online learning and prioritized sampl
 agent = LSTMAgent(train_simulators=SavingJohnSimulator())
 
 # Learn the vocabulary (the function samples the game using a random policy)
-agent.initialize_tokens()
+agent.initialize_tokens('vocabulary.txt')
 
 optimizer = RMSprop(lr=0.001)
 

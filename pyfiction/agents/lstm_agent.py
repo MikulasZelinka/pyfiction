@@ -1,3 +1,4 @@
+import codecs
 import logging
 import os
 import random
@@ -96,13 +97,14 @@ class LSTMAgent(agent.Agent):
         state and action pairs to learn to act optimally.
 
     Architecture of the q(s, a) NN estimator:
-        Embedding(state), Embedding(action) - LSTM(s), LSTM(a) - Dense(s), Dense(a) - Dot(s, a)
+        Embedding(state), Embedding(action) - LSTM(s), LSTM(a) - DenseState(s), DenseAction(a) - Dot(s, a)
 
     Features:
         - Embedding and LSTM layers are shared between states and actions
         - supports loading pre-trained word embeddings (such as GloVe or word2vec)
         - experience-replay with prioritized sampling (experiences with positive rewards are prioritized)
         - uses intrinsic motivation in the form of penalizing q(s, a) if 'a' was already chosen in 's'
+          for action selection
 
     This agent class is universal and it should be possible to apply it to different games in the same way
     """
@@ -136,7 +138,7 @@ class LSTMAgent(agent.Agent):
 
         # for prioritized sampling of positive experiences
         self.prioritized_experiences_queue = deque(maxlen=64)
-        # for detection of unique experiences (stores lists instead of data used for learning:
+        # for detection of unique experiences (stores lists instead of data used for learning):
         self.unique_prioritized_experiences_queue = deque(maxlen=64)
 
         self.state_action_history = None
@@ -191,8 +193,7 @@ class LSTMAgent(agent.Agent):
         """
 
         num_words = len(self.tokenizer.word_index)
-        logger.info('Creating a model based on %s unique tokens in the word index: %s', num_words,
-                    self.tokenizer.word_index)
+        logger.info('Creating a model based on %s unique tokens.', num_words)
 
         # create the shared embedding layer (with or without pre-trained weights)
         embedding_shared = None
@@ -258,7 +259,28 @@ class LSTMAgent(agent.Agent):
         model.summary()
         print('---------------')
 
-    def initialize_tokens(self):
+    def initialize_tokens(self, vocabulary=None):
+        """
+        Initialize the agent's vocabulary by either randomly sampling the simulators or by specifying a list of words
+        :param vocabulary: path to the file with list of tokens (one per line)
+        :return:
+        """
+
+        if vocabulary:
+            logger.info('Initializing tokens by loading them from %s', vocabulary)
+
+            try:
+                with open(vocabulary, "r") as f:
+                    words = f.readlines()
+
+                self.tokenizer.fit_on_texts(words)
+
+                logger.info('Tokenizer: %s words - %s', len(self.tokenizer.word_index.items()),
+                            self.tokenizer.word_index)
+                return
+            except IOError as e:
+                logger.warning('Could not find the specified vocabulary file %s: %s; Sampling new data instead',
+                               vocabulary, e)
 
         logger.info('Initializing tokens by playing the game randomly with all train and test simulators')
 
@@ -284,13 +306,17 @@ class LSTMAgent(agent.Agent):
                     len(self.tokenizer.word_index.items()),
                     self.tokenizer.word_index)
 
-        # Store the token information in a text file for embedding visualization
-        with open('logs/embeddings.tsv', 'wb') as file:
+        # Store the sampled vocabulary so that we don't have to always sample the game randomly
+        with open('vocabulary.txt', 'w') as f:
+            f.writelines([word + '\n' for word in self.tokenizer.word_index.keys()])
+        logger.info('Saved the vocabulary to vocabulary.txt')
+
+        # Store the token information in a text file for embedding visualization in tensorboard
+        with open('logs/embeddings.tsv', 'wb') as f:
             # write an empty token for the first null embedding
-            file.write(b'EMPTY_EMBEDDING_TOKEN\n')
+            f.write(b'EMPTY_EMBEDDING_TOKEN\n')
             for token in list(self.tokenizer.word_index.keys()):
-                file.write(token.encode('utf-8') + b'\n')
-            file.close()
+                f.write(token.encode('utf-8') + b'\n')
             logger.info('Saved the embedding dictionary to logs/embeddings.tsv')
 
         # Clean text experience data
