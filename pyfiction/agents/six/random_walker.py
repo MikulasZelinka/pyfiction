@@ -6,6 +6,10 @@ from pyfiction.simulators.games.six_simulator import SixSimulator
 
 
 class RandomWalkerAgent(agent.Agent):
+    """
+    A random-walking agent for the parser-based game Six.
+    """
+
     def __init__(self):
         random.seed(0)
         self.actions = ['north\n', 'south\n', 'west\n', 'east\n']

@@ -13,10 +13,10 @@ An example agent for Machine of Death that uses online learning and prioritized 
 """
 
 # Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(train_simulators=MachineOfDeathSimulator)
+agent = LSTMAgent(train_simulators=MachineOfDeathSimulator())
 
 # Learn the vocabulary (the function samples the game using a random policy)
-agent.initialize_tokens(iterations=2 ** 13, max_steps=500)
+agent.initialize_tokens()
 
 optimizer = RMSprop(lr=0.0005)
 
@@ -43,15 +43,19 @@ for i in range(epochs):
     agent.train_online(episodes=256 * 256, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.999,
                        prioritized_fraction=0.25, test_interval=4, test_steps=4)
 
-# Test on paraphrased actions
-# agent.simulator = MachineOfDeathSimulator(paraphrase_actions=True)
-# agent.model = load_model('logs/Epoch3_06-14-05_29_25.h5')
-# episodes = 256
-# for i in range(episodes):
-#     logger.info('Final reward: %s',
-#                 agent.play_game(max_steps=500, episodes=8, verbose=False, store_experience=False, epsilon=0))
 
-# for i in range(episodes):
-#     logger.info('Train reward: %s',
-#                 agent.train_online(episodes=1, max_steps=500, batch_size=128, gamma=0.95, epsilon=0, reward_scale=20,
-#                                    epsilon_decay=0, prioritized_fraction=0.25, test_steps=1))
+# Test on paraphrased actions
+test_simulator = MachineOfDeathSimulator(paraphrase_actions=True)
+
+# optionally load the model if not directly continuing after learning on non-paraphrased actions:
+# agent.model = load_model('logs/Epoch3_06-14-05_29_25.h5')
+
+# First test performance directly without any learning:
+episodes = 256
+for i in range(episodes):
+    agent.play_game(episodes=8, store_experience=False, epsilon=0, simulators=[test_simulator])
+
+# Transfer learning on paraphrased actions with the original vocabulary and not freezing any layers:
+agent.clear_experience()
+agent.train_simulators = [test_simulator]
+agent.train_online(episodes=256, epsilon=0.1, prioritized_fraction=0.25, test_steps=4)

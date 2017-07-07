@@ -35,6 +35,7 @@ def softmax(x):
 def preprocess(text, chars='', remove_all_special=True, expand=True, split_numbers=True):
     """
     function that removes whitespaces, converts to lowercase, etc.
+    :param split_numbers:
     :param remove_all_special:
     :param expand: expand 'll, 'm and similar expressions to reduce the number of different tokens
     :param text: text input
@@ -119,10 +120,10 @@ class LSTMAgent(agent.Agent):
         random.seed(0)
         np.random.seed(0)
 
-        if type(train_simulators) is Simulator:
+        if isinstance(train_simulators, Simulator):
             train_simulators = [train_simulators]
 
-        if type(test_simulators) is Simulator:
+        if isinstance(test_simulators, Simulator):
             test_simulators = [test_simulators]
 
         self.train_simulators = train_simulators
@@ -172,6 +173,15 @@ class LSTMAgent(agent.Agent):
 
         # return an action with maximum Q value
         return self.q_precomputed_state(state, actions, softmax_selection=False, penalize_history=True)
+
+    def clear_experience(self):
+        """
+        Clears all sampling experience of the agent
+        :return:
+        """
+        self.experience = []
+        self.prioritized_experiences_queue.clear()
+        self.unique_prioritized_experiences_queue.clear()
 
     def create_model(self, embedding_dimensions, lstm_dimensions, dense_dimensions, optimizer, embeddings=None,
                      embeddings_trainable=True):
@@ -256,8 +266,8 @@ class LSTMAgent(agent.Agent):
             logger.info('Playing %s randomly %s times', simulator, simulator.initialization_iterations)
 
             # Temporarily store all experience and use it to get the tokens, use each simulator once
-            self.play_game(episodes=simulator.initialization_iterations, max_steps=simulator.max_steps,
-                           store_experience=True, initialize_only=True, epsilon=1, simulators=simulator)
+            self.play_game(episodes=simulator.initialization_iterations, store_experience=True, initialize_only=True,
+                           epsilon=1, simulators=[simulator])
 
         logger.info('Successfully sampled all games, got total %s experiences', len(self.experience))
 
@@ -312,7 +322,6 @@ class LSTMAgent(agent.Agent):
         Uses the model to play the game. Each simulator is used to play the game exactly episodes times.
         :param simulators: a list of games (their simulators) to play the game with (more simulators = more games)
         :param episodes: Number of games to be played.
-        :param max_steps: Maximum number of steps (to prevent the agent from cycling)
         :param initialize_only: Only store text descriptions and not sequences, used for initializing tokenizer
         :param store_experience: Whether to store new experiences for training while playing.
         :param epsilon: Probability of choosing a random action.
@@ -463,21 +472,22 @@ class LSTMAgent(agent.Agent):
 
         for i in range(episodes):
 
-            # Train
-            # Let the agent sample and store game data with the given epsilon (usually decreasing over time)
+            logger.info('\n------------------------------------------\nEpisode {}, epsilon = {:.4f}'.format(i, epsilon))
+
+            # Epsilon-greedy train sampling and experience saving (epsilon usually decreasing over time):
             train_rewards = self.play_game(episodes=1, store_experience=True, epsilon=epsilon,
                                            simulators=self.train_simulators)
             train_rewards_history.append(train_rewards)
+            logger.info(
+                "Train rewards: " + " ".join(str(x) for x in ['{:.1f}'.format(reward) for reward in train_rewards]))
 
-            logger.info('\n------------------------------------------\nEpisode {}, epsilon = {:.4f}'.format(i, epsilon))
-            logger.info('Train rewards: {:.1f}'.format(train_rewards))
-
-            # Test the agent after each test_steps episodes
+            # Test the agent after each test_steps episodes with a zero epsilon
             if ((i + 1) % test_interval) == 0:
                 test_rewards = self.play_game(episodes=test_steps, store_experience=False, epsilon=0,
                                               simulators=self.test_simulators)
                 test_rewards_history.append(test_rewards)
-                logger.info('Test reward: {:.1f}'.format(test_rewards))
+                logger.info(
+                    "Test rewards: " + " ".join(str(x) for x in ['{:.1f}'.format(reward) for reward in test_rewards]))
 
             if len(self.experience) < 1:
                 return
