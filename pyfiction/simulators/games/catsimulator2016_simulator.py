@@ -79,8 +79,8 @@ class CatSimulator2016Simulator(HTMLSimulator):
                 elif ending.startswith('finish this'):
                     reward = -20
                 # befriended the bird - food and sleep
-                # elif ending.startswith('friendship'):
-                #     reward = 20
+                elif ending.startswith('friendship'):
+                    reward = 20
                 # no food, slept on the counter
                 elif ending.startswith('not this time, water'):
                     reward = 10
