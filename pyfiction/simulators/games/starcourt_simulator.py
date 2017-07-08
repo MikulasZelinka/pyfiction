@@ -14,7 +14,7 @@ class StarCourtSimulator(HTMLSimulator):
 
     # the recommended number of random game walkthroughs for vocabulary initialization
     # should ideally cover all possible states and used words
-    initialization_iterations = 1024
+    initialization_iterations = 4096
 
     # if the game rewards are in e.g. [-30, 30], set the reward scale to 30 so that the result is in [-1, 1]
     reward_scale = 30
@@ -35,12 +35,7 @@ class StarCourtSimulator(HTMLSimulator):
         try:
             # text is always in the the tw-story html tag:
             passage = self.driver.find_element_by_class_name("passage")
-            try:
-                text = passage.text
-            except StaleElementReferenceException as e:
-                print('WARNING:', self.game.name, ' stale element reference exception:', e)
-                time.sleep(0.1)
-                text = (self.driver.find_element_by_class_name("passage")).text
+            text = passage.text
 
             # self.actions = [(action.text, action) for action in passage.find_elements_by_class_name("internalLink")]
             self.actions = [(action.text, action) for action in passage.find_elements_by_tag_name("a")]
@@ -126,7 +121,7 @@ class StarCourtSimulator(HTMLSimulator):
             elif self.shuffle:
                 random.shuffle(self.actions)
 
-        except (UnknownEndingException, NoSuchElementException) as e:
+        except (UnknownEndingException, NoSuchElementException, StaleElementReferenceException) as e:
 
             if tries == 0:
                 print('WARNING, simulator exception:', e)
