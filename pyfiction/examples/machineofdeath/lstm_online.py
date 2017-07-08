@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 """
-An example agent for Machine of Death that uses online learning and prioritized sampling
+An example agent for Machine of Death that uses online learning and prioritized sampling, also test paraphrased data
 """
 
 simulator = MachineOfDeathSimulator(paraphrase_actions=False)
@@ -44,3 +44,9 @@ for i in range(epochs):
     logger.info('Epoch %s', i)
     agent.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon_decay=0.999,
                        prioritized_fraction=0.25, test_interval=8, test_steps=5)
+
+agent.clear_experience()
+agent.train_simulators = [simulator_paraphrased]
+agent.test_simulators = [simulator_paraphrased, simulator]
+agent.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.99,
+                   prioritized_fraction=0.25, test_interval=16, test_steps=5, log_prefix='paraphrased')
