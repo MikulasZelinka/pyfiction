@@ -79,6 +79,6 @@ for i in range(epochs):
 # train the agent on the tested game
 if simulator_index != 0:
     agent.clear_experience()
-    agent.train_simulators = test_simulators
+    agent.train_simulators = test_simulators if isinstance(test_simulators, list) else [test_simulators]
     agent.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.999,
                        prioritized_fraction=0.25, test_interval=16, test_steps=5, log_prefix=str(simulator_index))
