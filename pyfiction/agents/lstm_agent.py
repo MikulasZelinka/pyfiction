@@ -15,9 +15,10 @@ from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
 
 from keras.layers import LSTM, Dense, Embedding, Dot
+from selenium.common.exceptions import NoSuchElementException
 
 from pyfiction.agents import agent
-from pyfiction.simulators.simulator import Simulator
+from pyfiction.simulators.simulator import Simulator, UnknownEndingException
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -375,6 +376,9 @@ class LSTMAgent(agent.Agent):
 
                 episode_reward = 0
 
+                # indicates whether a simulator read error has occurred
+                error = False
+
                 while len(actions) > 0 and steps <= self.simulator.max_steps:
 
                     action, q_value = self.act(state, actions, epsilon)
@@ -391,7 +395,17 @@ class LSTMAgent(agent.Agent):
                     last_state = state
                     last_action = actions[action]
 
-                    (state, actions, reward) = self.simulator.read()
+                    error = False
+
+                    try:
+                        (state, actions, reward) = self.simulator.read()
+                    except (UnknownEndingException, NoSuchElementException) as e:
+                        logger.error('LSTM Agent simulator read error: %s', e)
+                        logger.warning('Interrupting the current episode, not assigning any reward')
+                        # simulator_rewards.append(None)
+                        error = True
+                        break
+
                     state = preprocess(state)
                     actions = [preprocess(a) for a in actions]
 
@@ -411,13 +425,15 @@ class LSTMAgent(agent.Agent):
                     episode_reward += reward
                     steps += 1
 
-                # store only episodes that did not exceed max steps or if still getting tokens
-                if store_experience and (steps < self.simulator.max_steps or initialize_only):
-                    for last_state, last_action, reward, state, actions, finished in experiences:
-                        self.store_experience(last_state, last_action, reward,
-                                              state, actions, finished, initialize_only)
+                if not error:
+                    # store only episodes that did not exceed max steps or if still getting tokens
+                    if store_experience and (steps < self.simulator.max_steps or initialize_only):
+                        for last_state, last_action, reward, state, actions, finished in experiences:
+                            self.store_experience(last_state, last_action, reward,
+                                                  state, actions, finished, initialize_only)
 
-                simulator_rewards.append(episode_reward * self.simulator.reward_scale)
+                    simulator_rewards.append(episode_reward * self.simulator.reward_scale)
+
                 self.simulator.restart()
 
             rewards.append(simulator_rewards)

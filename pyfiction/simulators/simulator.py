@@ -27,3 +27,7 @@ class Simulator:
 
     def read(self, timeout=0.01):
         raise NotImplementedError("Game is an abstract class.")
+
+
+class UnknownEndingException(Exception):
+    """Reached a state without any actions but cannot assign a reward, unknown state"""

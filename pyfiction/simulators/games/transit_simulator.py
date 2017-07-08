@@ -1,7 +1,11 @@
 import random
 
+import time
+from selenium.common.exceptions import NoSuchElementException
+
 from pyfiction.games.Transit.transit import Transit
 from pyfiction.simulators.html_simulator import HTMLSimulator
+from pyfiction.simulators.simulator import UnknownEndingException
 
 
 class TransitSimulator(HTMLSimulator):
@@ -37,66 +41,79 @@ class TransitSimulator(HTMLSimulator):
         self.actions_history.append(action_text)
         action.click()
 
-    def read(self):
+    def read(self, tries=0, max_tries=10):
 
-        # text is always in the last passage div:
-        last_state = self.driver.find_elements_by_class_name("passage")[-1]
-        text = last_state.text
-        self.actions = []
+        try:
 
-        self.actions += [(action.text, action) for action in last_state.find_elements_by_tag_name("a") if
-                         action.text]
+            # text is always in the last passage div:
+            last_state = self.driver.find_elements_by_class_name("passage")[-1]
+            text = last_state.text
+            self.actions = []
 
-        had_actions = len(self.actions) > 0
+            self.actions += [(action.text, action) for action in last_state.find_elements_by_tag_name("a") if
+                             action.text]
 
-        # filter the already used actions (workaround for the game bug that causes infinite loops)
-        self.actions = [action for action in self.actions if action[0] not in self.actions_history]
+            had_actions = len(self.actions) > 0
 
-        reward = -0.1
+            # filter the already used actions (workaround for the game bug that causes infinite loops)
+            self.actions = [action for action in self.actions if action[0] not in self.actions_history]
 
-        if had_actions and not self.actions:
-            print('WARNING: Transit simulator removed all actions because of a game bug! Ending with a 0 reward.')
-            return '', [], 0
+            reward = -0.1
 
-        if not self.actions:
-            ending = text.lower()
+            if had_actions and not self.actions:
+                print('WARNING: Transit simulator removed all actions because of a game bug! Ending with a 0 reward.')
+                return '', [], 0
 
-            # tackled a man, found the friend
-            if ending.startswith('if anyone can help you'):
-                reward = 10
-            # death by poisoning
-            elif ending.startswith('you buy one more can'):
-                reward = -20
-            # tackled the correct man
-            elif ending.startswith('even though it was just in-passing'):
-                reward = 20
-            # shot by the security
-            elif ending.startswith('you make swift use of'):
-                reward = -20
-            # jail
-            elif ending.startswith('the guards know'):
-                reward = -10
-            # jail
-            elif ending.startswith('as you predicted'):
-                reward = -10
-            # death in a foreign country
-            elif ending.endswith('you close your eyes and submit to death.'):
-                reward = -20
-            # jail in a foreign country
-            elif ending.startswith('you\'re in a country'):
-                reward = -10
-            # escaped to the plane with the help of energy drinks
-            elif ending.startswith('through the haze of the drinks'):
-                reward = 10
-            # ended in a jail with the help of energy drinks
-            elif ending.startswith('while the last parts of your mind untouched'):
-                reward = -10
+            if not self.actions:
+                ending = text.lower()
+
+                # tackled a man, found the friend
+                if ending.startswith('if anyone can help you'):
+                    reward = 10
+                # death by poisoning
+                elif ending.startswith('you buy one more can'):
+                    reward = -20
+                # tackled the correct man
+                elif ending.startswith('even though it was just in-passing'):
+                    reward = 20
+                # shot by the security
+                elif ending.startswith('you make swift use of'):
+                    reward = -20
+                # jail
+                elif ending.startswith('the guards know'):
+                    reward = -10
+                # jail
+                elif ending.startswith('as you predicted'):
+                    reward = -10
+                # death in a foreign country
+                elif ending.endswith('you close your eyes and submit to death.'):
+                    reward = -20
+                # jail in a foreign country
+                elif ending.startswith('you\'re in a country'):
+                    reward = -10
+                # escaped to the plane with the help of energy drinks
+                elif ending.startswith('through the haze of the drinks'):
+                    reward = 10
+                # ended in a jail with the help of energy drinks
+                elif ending.startswith('while the last parts of your mind untouched'):
+                    reward = -10
+                else:
+                    raise UnknownEndingException('Unknown ending text, cannot assign reward: ', ending)
+
+            elif self.shuffle:
+                random.shuffle(self.actions)
+
+        except (UnknownEndingException, NoSuchElementException) as e:
+
+            if tries == 0:
+                print('WARNING, simulator exception:', e)
+
+            if tries < max_tries:
+                print('Trying to read again after a short wait, try', tries + 1, 'out of', max_tries)
+                time.sleep(0.1)
+                return self.read(tries=tries + 1)
             else:
-                raise Exception('Game ended and no actions left but an unknown ending reached, cannot assign reward: ',
-                                ending)
-
-        elif self.shuffle:
-            random.shuffle(self.actions)
+                raise e
 
         return text, [action[0] for action in self.actions], reward
 
