@@ -378,7 +378,14 @@ class LSTMAgent(agent.Agent):
 
                 self.reset_history()
 
-                (state, actions, reward) = self.simulator.read()
+                try:
+                    (state, actions, reward) = self.simulator.read()
+                except (UnknownEndingException, NoSuchElementException) as e:
+                    logger.error('LSTM Agent simulator read error: %s', e)
+                    logger.warning('Interrupting the current episode, not assigning any reward')
+                    self.simulator.restart()
+                    continue
+
                 state = preprocess(state)
                 actions = [preprocess(a) for a in actions]
 

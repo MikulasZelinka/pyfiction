@@ -103,7 +103,7 @@ class TransitSimulator(HTMLSimulator):
             elif self.shuffle:
                 random.shuffle(self.actions)
 
-        except (UnknownEndingException, NoSuchElementException) as e:
+        except (UnknownEndingException, NoSuchElementException, IndexError) as e:
 
             if tries == 0:
                 print('WARNING, simulator exception:', e)
