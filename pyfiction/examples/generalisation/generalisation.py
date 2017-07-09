@@ -25,6 +25,14 @@ simulators = [CatSimulator2016Simulator(),
               StarCourtSimulator(),
               TheRedHairSimulator(),
               TransitSimulator()]
+test_steps = [
+    1,
+    5,
+    1,
+    5,
+    1,
+    1
+]
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--simulator',
@@ -42,6 +50,7 @@ if simulator_index == 0:
 else:
     train_simulators = simulators[:simulator_index - 1] + simulators[simulator_index:]
     test_simulators = simulators[simulator_index - 1]
+    test_steps = test_steps[simulator_index - 1]
     print('Training on games:', [simulator.game.name for simulator in train_simulators])
     print('Testing on game:', test_simulators.game.name)
 
@@ -68,17 +77,19 @@ try:
 except ImportError as e:
     logger.warning("Couldn't print the model image: {}".format(e))
 
-# Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
+# Iteratively train the agent on five out of the six games
 # This example seems to ...
 epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
     agent.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.999,
-                       prioritized_fraction=0.25, test_interval=16, test_steps=5, log_prefix=str(simulator_index))
+                       prioritized_fraction=0.25, test_interval=16, test_steps=test_steps,
+                       log_prefix=str(simulator_index))
 
-# train the agent on the tested game
+# Transfer learning test - train the agent on the previously unseen (only used for testing) game
 if simulator_index != 0:
     agent.clear_experience()
     agent.train_simulators = test_simulators if isinstance(test_simulators, list) else [test_simulators]
     agent.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.999,
-                       prioritized_fraction=0.25, test_interval=16, test_steps=5, log_prefix=str(simulator_index))
+                       prioritized_fraction=0.25, test_interval=16, test_steps=test_steps,
+                       log_prefix=('transfer' + str(simulator_index)))

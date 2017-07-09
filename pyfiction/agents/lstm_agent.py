@@ -356,14 +356,22 @@ class LSTMAgent(agent.Agent):
 
         rewards = []
 
-        for simulator in simulators:
+        # used for variable episode count per simulator
+        episodes_per_simulator = episodes
+
+        for s in range(len(simulators)):
+
+            simulator = simulators[s]
 
             # set the reference to the current simulator so that other methods called from here can access it too
             self.simulator = simulator
 
             simulator_rewards = []
 
-            for i in range(episodes):
+            if isinstance(episodes, list):
+                episodes_per_simulator = episodes[s]
+
+            for i in range(episodes_per_simulator):
 
                 steps = 0
                 experiences = []
