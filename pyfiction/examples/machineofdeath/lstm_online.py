@@ -39,10 +39,10 @@ except ImportError as e:
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
 # This example seems to converge to nearly optimal rewards in all three game branches
-epochs = 8192
+epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    agent.train_online(episodes=1, batch_size=256, gamma=0.95, epsilon_decay=0.999,
+    agent.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon_decay=0.999,
                        prioritized_fraction=0.25, test_interval=8, test_steps=5)
 
 model = agent.model
