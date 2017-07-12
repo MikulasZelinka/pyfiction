@@ -1,7 +1,7 @@
 import argparse
 import logging
-import string
 
+from keras.models import load_model
 from keras.optimizers import RMSprop
 from keras.utils import plot_model
 from pyfiction.agents.lstm_agent import LSTMAgent
@@ -37,34 +37,25 @@ test_steps = [
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--simulator',
-                    help='index of a simulator to use for leave-one-out testing [1-6], 0 for training and testing all',
+                    help='index of a simulator to use for leave-one-out testing [1-6]',
                     type=int,
                     default=0)
-
-parser.add_argument('--log_folder',
-                    help='a folder to store logs in, default is "logs"',
-                    type=string,
-                    default="logs")
+parser.add_argument('--model',
+                    help='file path of a model to load',
+                    type=str)
 
 args = parser.parse_args()
 simulator_index = args.simulator
-log_folder = args.log_folder
+model_path = args.model
 
-if simulator_index == 0:
-    train_simulators = simulators
-    test_simulators = simulators
-    print('Training and testing on all games:', [simulator.game.name for simulator in simulators])
-else:
-    train_simulators = simulators[:simulator_index - 1] + simulators[simulator_index:]
-    test_simulators = simulators[simulator_index - 1]
-    test_steps = test_steps[simulator_index - 1]
-    print('Training on games:', [simulator.game.name for simulator in train_simulators])
-    print('Testing on game:', test_simulators.game.name)
+simulator = simulators[simulator_index - 1]
+test_steps = test_steps[simulator_index - 1]
+print('Training on game:', simulator.game.name)
+print('Testing on game:', simulator.game.name)
 
-# Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(train_simulators=train_simulators, test_simulators=test_simulators, log_folder=log_folder)
+agent = LSTMAgent(train_simulators=simulator)
 
-# Load or learn the vocabulary (random sampling on this many games could be extremely slow)
+# Load or learn the vocabulary (random sampling on many games could be extremely slow)
 agent.initialize_tokens('vocabulary.txt')
 
 optimizer = RMSprop(lr=0.00001)
@@ -78,25 +69,16 @@ agent.create_model(embedding_dimensions=embedding_dimensions,
                    dense_dimensions=dense_dimensions,
                    optimizer=optimizer)
 
+agent.model = load_model(model_path)
+
 # Visualize the model
 try:
     plot_model(agent.model, to_file='model.png', show_shapes=True)
 except ImportError as e:
     logger.warning("Couldn't print the model image: {}".format(e))
 
-# Iteratively train the agent on five out of the six games
-# This example seems to ...
-epochs = 1
-for i in range(epochs):
-    logger.info('Epoch %s', i)
-    agent.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.999,
-                       prioritized_fraction=0.25, test_interval=16, test_steps=test_steps,
-                       log_prefix=str(simulator_index))
-
 # Transfer learning test - train the agent on the previously unseen (only used for testing) game
-if simulator_index != 0:
-    agent.clear_experience()
-    agent.train_simulators = test_simulators if isinstance(test_simulators, list) else [test_simulators]
-    agent.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.999,
-                       prioritized_fraction=0.25, test_interval=16, test_steps=test_steps,
-                       log_prefix=('transfer' + str(simulator_index)))
+
+agent.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.999,
+                   prioritized_fraction=0.25, test_interval=16, test_steps=test_steps,
+                   log_prefix=('transfer' + str(simulator_index)))

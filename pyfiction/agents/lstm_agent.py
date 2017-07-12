@@ -109,7 +109,7 @@ class LSTMAgent(agent.Agent):
     This agent class is universal and it should be possible to apply it to different games in the same way
     """
 
-    def __init__(self, train_simulators, test_simulators=None, max_words=8192):
+    def __init__(self, train_simulators, test_simulators=None, log_folder='logs', max_words=8192):
         """
 
         :param train_simulators:
@@ -153,11 +153,12 @@ class LSTMAgent(agent.Agent):
 
         self.tokenizer = Tokenizer(num_words=max_words)  # maximum number of unique words to use
 
-        os.makedirs('logs', exist_ok=True)
+        self.log_folder = log_folder
+        os.makedirs(log_folder, exist_ok=True)
 
         # visualization
         self.tensorboard = TensorBoard(log_dir='./logs', write_graph=False, write_images=True,
-                                       embeddings_freq=1, embeddings_metadata='logs/embeddings.tsv')
+                                       embeddings_freq=1, embeddings_metadata=log_folder + '/embeddings.tsv')
 
     def act(self, state, actions, epsilon=0):
         """
@@ -312,7 +313,7 @@ class LSTMAgent(agent.Agent):
         logger.info('Saved the vocabulary to vocabulary.txt')
 
         # Store the token information in a text file for embedding visualization in tensorboard
-        with open('logs/embeddings.tsv', 'wb') as f:
+        with open(self.log_folder + '/embeddings.tsv', 'wb') as f:
             # write an empty token for the first null embedding
             f.write(b'EMPTY_EMBEDDING_TOKEN\n')
             for token in list(self.tokenizer.word_index.keys()):
@@ -623,7 +624,7 @@ class LSTMAgent(agent.Agent):
 
                 file_name = 'ep' + str(i) + '_' + datetime.datetime.now().strftime('%m-%d-%H_%M_%S')
 
-                with open('logs/' + log_prefix + '_train_' + file_name + '.txt', 'w') as file:
+                with open(self.log_folder + '/' + log_prefix + '_train_' + file_name + '.txt', 'w') as file:
                     for simulator_rewards in train_rewards_history:
                         for rewards in simulator_rewards:
                             for reward in rewards:
@@ -631,7 +632,7 @@ class LSTMAgent(agent.Agent):
                             file.write(',')
                         file.write('\n')
 
-                with open('logs/' + log_prefix + '_test_' + file_name + '.txt', 'w') as file:
+                with open(self.log_folder + '/' + log_prefix + '_test_' + file_name + '.txt', 'w') as file:
                     for simulator_rewards in test_rewards_history:
                         for rewards in simulator_rewards:
                             for reward in rewards:
@@ -640,7 +641,7 @@ class LSTMAgent(agent.Agent):
                         file.write('\n')
 
                 # save the model
-                self.model.save('logs/' + log_prefix + file_name + '.h5')
+                self.model.save(self.log_folder + '/' + log_prefix + file_name + '.h5')
 
         return
 

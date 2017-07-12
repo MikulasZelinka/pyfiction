@@ -32,7 +32,7 @@ agent.create_model(embedding_dimensions=embedding_dimensions,
                    dense_dimensions=dense_dimensions,
                    optimizer=optimizer)
 
-agent.model = load_model('logs/ep8191_07-08-09_59_21.h5')
+agent.model = load_model('logs/ep8191_07-10-02_21_40')
 
 # Visualize the model
 try:

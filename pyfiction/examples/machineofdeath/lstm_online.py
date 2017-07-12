@@ -39,14 +39,29 @@ except ImportError as e:
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
 # This example seems to converge to nearly optimal rewards in all three game branches
-epochs = 1
+epochs = 8192
 for i in range(epochs):
     logger.info('Epoch %s', i)
-    agent.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon_decay=0.999,
+    agent.train_online(episodes=1, batch_size=256, gamma=0.95, epsilon_decay=0.999,
                        prioritized_fraction=0.25, test_interval=8, test_steps=5)
 
-agent.clear_experience()
-agent.train_simulators = [simulator_paraphrased]
-agent.test_simulators = [simulator_paraphrased, simulator]
-agent.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.99,
-                   prioritized_fraction=0.25, test_interval=16, test_steps=5, log_prefix='paraphrased')
+model = agent.model
+
+# transfer
+agent2 = LSTMAgent(train_simulators=[simulator_paraphrased], test_simulators=[simulator_paraphrased, simulator])
+agent2.initialize_tokens('vocabulary.txt')
+
+optimizer = RMSprop(lr=0.00001)
+
+embedding_dimensions = 16
+lstm_dimensions = 32
+dense_dimensions = 8
+
+agent2.create_model(embedding_dimensions=embedding_dimensions,
+                    lstm_dimensions=lstm_dimensions,
+                    dense_dimensions=dense_dimensions,
+                    optimizer=optimizer)
+agent2.model = model
+
+agent2.train_online(episodes=8192, batch_size=256, gamma=0.95, epsilon=1, epsilon_decay=0.99,
+                    prioritized_fraction=0.25, test_interval=16, test_steps=5, log_prefix='paraphrased')

@@ -18,7 +18,7 @@ agent = LSTMAgent(train_simulators=StarCourtSimulator())
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens('vocabulary.txt')
 
-optimizer = RMSprop(lr=0.0001)
+optimizer = RMSprop(lr=0.00001)
 
 embedding_dimensions = 16
 lstm_dimensions = 32
