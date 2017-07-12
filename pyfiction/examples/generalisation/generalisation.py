@@ -43,7 +43,7 @@ parser.add_argument('--simulator',
 
 parser.add_argument('--log_folder',
                     help='a folder to store logs in, default is "logs"',
-                    type=string,
+                    type=str,
                     default="logs")
 
 args = parser.parse_args()
