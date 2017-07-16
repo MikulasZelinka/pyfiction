@@ -724,6 +724,30 @@ class LSTMAgent(agent.Agent):
     def reset_history(self):
         self.state_action_history = {}
 
+    def q(self, state_text, action_text):
+        """
+        Computes the q-value of a state text and an action text; useful for testing trained agents
+        :param state_text:
+        :param action_text:
+        :return:
+        """
+        state = self.vectorize([preprocess(state_text)])[0]
+        action = self.vectorize([preprocess(action_text)])[0]
+
+        print('State embedding indices:', state)
+        print('State embedding tokens:',
+              [list(self.tokenizer.word_index.keys())[list(self.tokenizer.word_index.values()).index(x)]
+               if x in self.tokenizer.word_index.values() else ''
+               for x in state])
+
+        print('Action embedding indices:', action)
+        print('Action embedding tokens:',
+              [list(self.tokenizer.word_index.keys())[list(self.tokenizer.word_index.values()).index(x)]
+               if x in self.tokenizer.word_index.values() else ''
+               for x in action])
+
+        return self.q_precomputed_state(state, [action])[1]
+
 
         # offline and per-trace training have not been updated since possibly breaking changes in the agent class
         # TODO test and readd these
