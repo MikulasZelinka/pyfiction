@@ -4,12 +4,13 @@ import logging
 from keras.models import load_model
 from keras.optimizers import RMSprop
 from keras.utils import plot_model
-from pyfiction.agents.lstm_agent import LSTMAgent
+from pyfiction.agents.ssaqn_agent import SSAQNAgent
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 """
-Load a model of an agent and interactively test its Q-values of the state and action texts supplied by the user
+Load a model of an SSAQN agent trained on all six games
+ and interactively test its Q-values of the state and action texts supplied by the user
 """
 
 parser = argparse.ArgumentParser()
@@ -23,7 +24,7 @@ parser.add_argument('--model',
 args = parser.parse_args()
 model_path = args.model
 
-agent = LSTMAgent(None)
+agent = SSAQNAgent(None)
 
 # Load or learn the vocabulary (random sampling on many games could be extremely slow)
 agent.initialize_tokens('vocabulary.txt')

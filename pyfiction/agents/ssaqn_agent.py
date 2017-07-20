@@ -36,8 +36,8 @@ def softmax(x):
 def preprocess(text, chars='', remove_all_special=True, expand=True, split_numbers=True):
     """
     function that removes whitespaces, converts to lowercase, etc.
-    :param split_numbers:
-    :param remove_all_special:
+    :param split_numbers: split 45787 to 4 5 7 8 7
+    :param remove_all_special: remove all characters but  alpha-numerical, spaces, hyphens, quotes
     :param expand: expand 'll, 'm and similar expressions to reduce the number of different tokens
     :param text: text input
     :param chars: chars to be removed
@@ -78,6 +78,12 @@ def preprocess(text, chars='', remove_all_special=True, expand=True, split_numbe
 
 
 def load_embeddings(path):
+    """
+    loads embeddings from a file and their their index (a dictionary of words with coefficients)
+    tested on GloVe
+    :param path: path to the embedding file
+    :return:
+    """
     embeddings_index = {}
     f = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), path))
     for line in f:
@@ -91,9 +97,10 @@ def load_embeddings(path):
     return embeddings_index
 
 
-class LSTMAgent(agent.Agent):
+class SSAQNAgent(agent.Agent):
     """
-    Basic Q-learning agent that uses LSTMs on top of word embeddings to estimate Q-values of perceived
+    Siamese State-Action Q-Network agent
+    A type Q-learning agent that uses shared LSTMs on top of shared word embeddings to estimate Q-values of perceived
         state and action pairs to learn to act optimally.
 
     Architecture of the q(s, a) NN estimator:
@@ -189,7 +196,7 @@ class LSTMAgent(agent.Agent):
     def create_model(self, embedding_dimensions, lstm_dimensions, dense_dimensions, optimizer, embeddings=None,
                      embeddings_trainable=True):
         """
-        creates the neural network model using precomputed embeddings applied to the training data
+        creates the neural network model, optionally using precomputed embeddings applied to the training data
         :return: 
         """
 
@@ -478,6 +485,17 @@ class LSTMAgent(agent.Agent):
 
     def store_experience(self, state_text, action_text, reward, state_next_text, actions_next_texts, finished,
                          store_text_only=False):
+        """
+        Stores the supplied tuple into the experience replay memory D.
+        :param state_text:
+        :param action_text:
+        :param reward:
+        :param state_next_text:
+        :param actions_next_texts:
+        :param finished:
+        :param store_text_only:
+        :return:
+        """
 
         # storing the text version of experience is only necessary prior to fitting the tokenizer
         if store_text_only:
@@ -510,13 +528,13 @@ class LSTMAgent(agent.Agent):
                      prioritized_fraction=0, test_interval=1, test_steps=1, checkpoint_steps=128, log_prefix=''):
         """
         Trains the model while playing at the same time
-        :param log_prefix:
-        :param test_steps:
-        :param checkpoint_steps:
+        :param log_prefix: file prefix for logs
+        :param test_steps: test the model each N steps on the test simulators
+        :param checkpoint_steps: save the model each N steps
         :param test_interval: test the agent after each N steps (batches)
-        :param epsilon_decay: 
-        :param epsilon: 
-        :param episodes:
+        :param epsilon_decay: rate at which epsilon decays (in each episodes, epsilon *= epsilon_decay)
+        :param epsilon: probability of choosing a random action
+        :param episodes: the maximum number of episodes
         :param batch_size: number of experiences to be used for training (each is used once)
         :param gamma: discount factor (higher gamma ~ taking future into account more)
         :param prioritized_fraction: only sample prioritized experience (final states with higher reward values)
@@ -703,6 +721,12 @@ class LSTMAgent(agent.Agent):
         return best_action, q_max
 
     def add_to_history(self, state, action):
+        """
+        Adds a state, action pair to the history of the current episode, or increases its counter if already present
+        :param state:
+        :param action:
+        :return:
+        """
 
         state = tuple(np.trim_zeros(state, 'f'))
         action = tuple(np.trim_zeros(action, 'f'))
@@ -713,6 +737,11 @@ class LSTMAgent(agent.Agent):
             self.state_action_history[(state, action)] = 1
 
     def get_history(self, state, action):
+        """
+        :param state:
+        :param action:
+        :return: h(s,a), i.e. the number of times given action was selected in given state in the current episode
+        """
 
         state = tuple(np.trim_zeros(state, 'f'))
         action = tuple(np.trim_zeros(action, 'f'))
@@ -722,6 +751,10 @@ class LSTMAgent(agent.Agent):
         return 0
 
     def reset_history(self):
+        """
+        resets the history; called every time a game episode ends
+        :return:
+        """
         self.state_action_history = {}
 
     def q(self, state_text, action_text):

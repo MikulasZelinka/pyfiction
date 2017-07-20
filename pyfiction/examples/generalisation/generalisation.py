@@ -4,7 +4,7 @@ import string
 
 from keras.optimizers import RMSprop
 from keras.utils import plot_model
-from pyfiction.agents.lstm_agent import LSTMAgent
+from pyfiction.agents.ssaqn_agent import SSAQNAgent
 from pyfiction.simulators.games.catsimulator2016_simulator import CatSimulator2016Simulator
 from pyfiction.simulators.games.machineofdeath_simulator import MachineOfDeathSimulator
 from pyfiction.simulators.games.savingjohn_simulator import SavingJohnSimulator
@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 """
-An LSTM agent that supports leave-one-out generalisation testing
+An SSAQN agent that supports leave-one-out generalisation testing
 """
 
 simulators = [CatSimulator2016Simulator(),
@@ -62,7 +62,7 @@ else:
     print('Testing on game:', test_simulators.game.name)
 
 # Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(train_simulators=train_simulators, test_simulators=test_simulators, log_folder=log_folder)
+agent = SSAQNAgent(train_simulators=train_simulators, test_simulators=test_simulators, log_folder=log_folder)
 
 # Load or learn the vocabulary (random sampling on this many games could be extremely slow)
 agent.initialize_tokens('vocabulary.txt')
@@ -84,8 +84,8 @@ try:
 except ImportError as e:
     logger.warning("Couldn't print the model image: {}".format(e))
 
-# Iteratively train the agent on five out of the six games
-# This example seems to ...
+# Iteratively train the agent on five out of the six games or on all six games
+# This example seems to converge to the optimal reward in all games but Star Court  when training on all games
 epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)

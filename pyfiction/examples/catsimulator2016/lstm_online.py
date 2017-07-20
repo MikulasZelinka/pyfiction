@@ -2,18 +2,18 @@ import logging
 
 from keras.optimizers import RMSprop
 from keras.utils import plot_model
-from pyfiction.agents.lstm_agent import LSTMAgent
+from pyfiction.agents.ssaqn_agent import SSAQNAgent
 from pyfiction.simulators.games.catsimulator2016_simulator import CatSimulator2016Simulator
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 """
-An example agent for Cat Simulator 2016 that uses online learning and prioritized sampling
+An example agent for Cat Simulator 2016 that uses the SSAQN agent
 """
 
 # Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(train_simulators=CatSimulator2016Simulator())
+agent = SSAQNAgent(train_simulators=CatSimulator2016Simulator())
 
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens('vocabulary.txt')
@@ -36,7 +36,7 @@ except ImportError as e:
     logger.warning("Couldn't print the model image: {}".format(e))
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
-# This example seems to converge to ...
+# This example seems to converge to the optimal reward of 19.X
 epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)

@@ -2,7 +2,7 @@ import logging
 
 from keras.optimizers import RMSprop
 from keras.utils import plot_model
-from pyfiction.agents.lstm_agent import LSTMAgent
+from pyfiction.agents.ssaqn_agent import SSAQNAgent
 from pyfiction.simulators.games.savingjohn_simulator import SavingJohnSimulator
 from pyfiction.simulators.text_games.simulators.MySimulator import StoryNode
 
@@ -10,11 +10,11 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 """
-An example agent for Saving John that uses online learning and prioritized sampling
+An example SSAQN agent for Saving John that uses online learning and prioritized sampling
 """
 
 # Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(train_simulators=SavingJohnSimulator())
+agent = SSAQNAgent(train_simulators=SavingJohnSimulator())
 
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens('vocabulary.txt')
@@ -37,7 +37,7 @@ except ImportError as e:
     logger.warning("Couldn't print the model image: {}".format(e))
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
-# This example seems to converge to a reward of 19.3+ (with 19.4 being the optimal reward)
+# This example seems to converge to the optimal reward of 19.4
 epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)

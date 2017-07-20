@@ -3,20 +3,20 @@ import logging
 from keras.models import load_model
 from keras.optimizers import RMSprop
 from keras.utils import plot_model
-from pyfiction.agents.lstm_agent import LSTMAgent
+from pyfiction.agents.ssaqn_agent import SSAQNAgent
 from pyfiction.simulators.games.machineofdeath_simulator import MachineOfDeathSimulator
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 """
-An example agent for Machine of Death that tests transfer learning on paraphrased actions
+An example SSAQN agent for Machine of Death that tests transfer learning on paraphrased actions
 """
 
 simulator = MachineOfDeathSimulator(paraphrase_actions=False)
 simulator_paraphrased = MachineOfDeathSimulator(paraphrase_actions=True)
 # Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(train_simulators=simulator_paraphrased, test_simulators=[simulator_paraphrased, simulator])
+agent = SSAQNAgent(train_simulators=simulator_paraphrased, test_simulators=[simulator_paraphrased, simulator])
 
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens('vocabulary.txt')

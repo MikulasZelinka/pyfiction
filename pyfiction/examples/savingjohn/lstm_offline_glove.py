@@ -1,14 +1,14 @@
 import logging
 
 from keras.optimizers import SGD
-from pyfiction.agents.lstm_agent import LSTMAgent
+from pyfiction.agents.ssaqn_agent import SSAQNAgent
 from pyfiction.simulators.games.savingjohn_simulator import SavingJohnSimulator
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 """
-THIS EXAMPLE IS CURRENTLY OBSOLETE (breaking changes to the LSTMAgent class were introduces)
+TODO - THIS EXAMPLE IS CURRENTLY OBSOLETE (breaking changes to the SSAQNAgent class were introduced)
 An example agent for Saving John that uses offline learning and prioritized sampling
 The samples are obtained using a random policy, meaning this method is only suitable for games where a random policy
  samples the states evenly
@@ -16,7 +16,7 @@ This agent class is universal and it should be possible to apply it to different
 """
 
 # Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(simulator=SavingJohnSimulator, state_length=64, action_length=12)
+agent = SSAQNAgent(simulator=SavingJohnSimulator, state_length=64, action_length=12)
 
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens(iterations=1024, max_steps=100)

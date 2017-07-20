@@ -4,7 +4,7 @@ import logging
 from keras.models import load_model
 from keras.optimizers import RMSprop
 from keras.utils import plot_model
-from pyfiction.agents.lstm_agent import LSTMAgent
+from pyfiction.agents.ssaqn_agent import SSAQNAgent
 from pyfiction.simulators.games.catsimulator2016_simulator import CatSimulator2016Simulator
 from pyfiction.simulators.games.machineofdeath_simulator import MachineOfDeathSimulator
 from pyfiction.simulators.games.savingjohn_simulator import SavingJohnSimulator
@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 """
-An LSTM agent that supports leave-one-out generalisation testing
+An SSAQN agent that supports for testing transfer learning on pre-trained models
 """
 
 simulators = [CatSimulator2016Simulator(),
@@ -53,7 +53,7 @@ test_steps = test_steps[simulator_index - 1]
 print('Training on game:', simulator.game.name)
 print('Testing on game:', simulator.game.name)
 
-agent = LSTMAgent(train_simulators=simulator)
+agent = SSAQNAgent(train_simulators=simulator)
 
 # Load or learn the vocabulary (random sampling on many games could be extremely slow)
 agent.initialize_tokens('vocabulary.txt')

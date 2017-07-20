@@ -2,20 +2,20 @@ import logging
 
 from keras.optimizers import RMSprop
 from keras.utils import plot_model
-from pyfiction.agents.lstm_agent import LSTMAgent
+from pyfiction.agents.ssaqn_agent import SSAQNAgent
 from pyfiction.simulators.games.machineofdeath_simulator import MachineOfDeathSimulator
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 """
-An example agent for Machine of Death that uses online learning and prioritized sampling, also test paraphrased data
+An example SSAQN agent for Machine of Death (including paraphrased) that uses online learning and prioritized sampling
 """
 
 simulator = MachineOfDeathSimulator(paraphrase_actions=False)
 simulator_paraphrased = MachineOfDeathSimulator(paraphrase_actions=True)
 # Create the agent and specify maximum lengths of descriptions (in words)
-agent = LSTMAgent(train_simulators=simulator, test_simulators=[simulator, simulator_paraphrased])
+agent = SSAQNAgent(train_simulators=simulator, test_simulators=[simulator, simulator_paraphrased])
 
 # Learn the vocabulary (the function samples the game using a random policy)
 agent.initialize_tokens('vocabulary.txt')
@@ -38,7 +38,7 @@ except ImportError as e:
     logger.warning("Couldn't print the model image: {}".format(e))
 
 # Iteratively train the agent on a batch of previously seen examples while continuously expanding the experience buffer
-# This example seems to converge to nearly optimal rewards in all three game branches
+# This example seems to converge to nearly optimal rewards in at least  two out of three game branches
 epochs = 1
 for i in range(epochs):
     logger.info('Epoch %s', i)
@@ -48,7 +48,7 @@ for i in range(epochs):
 model = agent.model
 
 # transfer
-agent2 = LSTMAgent(train_simulators=[simulator_paraphrased], test_simulators=[simulator_paraphrased, simulator])
+agent2 = SSAQNAgent(train_simulators=[simulator_paraphrased], test_simulators=[simulator_paraphrased, simulator])
 agent2.initialize_tokens('vocabulary.txt')
 
 optimizer = RMSprop(lr=0.00001)
