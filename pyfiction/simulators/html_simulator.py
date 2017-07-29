@@ -4,9 +4,9 @@ from pyfiction.simulators.simulator import Simulator
 
 
 class HTMLSimulator(Simulator):
-    def __init__(self, game, shuffle=True):
+    def __init__(self, game, shuffle_actions=True):
         self.game = game
-        self.shuffle = shuffle
+        self.shuffle_actions = shuffle_actions
 
         # use a headless Chromium/Chrome browser
         chrome_options = webdriver.ChromeOptions()

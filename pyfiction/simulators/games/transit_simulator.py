@@ -19,8 +19,8 @@ class TransitSimulator(HTMLSimulator):
     # if the game rewards are in e.g. [-30, 30], set the reward scale to 30 so that the result is in [-1, 1]
     reward_scale = 20
 
-    def __init__(self, shuffle=True):
-        super().__init__(Transit, shuffle=shuffle)
+    def __init__(self, shuffle_actions=True):
+        super().__init__(Transit, shuffle_actions=shuffle_actions)
 
         self.actions = []
 
@@ -100,7 +100,7 @@ class TransitSimulator(HTMLSimulator):
                 else:
                     raise UnknownEndingException('Unknown ending text, cannot assign reward: ', ending)
 
-            elif self.shuffle:
+            elif self.shuffle_actions:
                 random.shuffle(self.actions)
 
         except (UnknownEndingException, NoSuchElementException, IndexError) as e:

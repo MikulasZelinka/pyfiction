@@ -16,8 +16,8 @@ class HowlingDogsSimulator(HTMLSimulator):
     # if the game rewards are in e.g. [-30, 30], set the reward scale to 30 so that the result is in [-1, 1]
     reward_scale = 10
 
-    def __init__(self, shuffle=True):
-        super().__init__(HowlingDogs, shuffle=shuffle)
+    def __init__(self, shuffle_actions=True):
+        super().__init__(HowlingDogs, shuffle_actions=shuffle_actions)
         self.restart()
 
     def restart(self):
@@ -56,7 +56,7 @@ class HowlingDogsSimulator(HTMLSimulator):
                 print('Game ended and no actions left but an unknown ending reached, cannot assign reward: ',
                       ending)
 
-        elif self.shuffle:
+        elif self.shuffle_actions:
             random.shuffle(self.actions)
 
         return text, self.actions, reward
