@@ -26,11 +26,16 @@ Requirements
 Installation
 ------------
 
-Clone the repository and install the library using: ::
+To install the latest published version, simply run: ::
+
+  pip install pyfiction
+
+
+To install the bleeding-edge version from this repository, run: ::
 
   git clone --recursive https://github.com/MikulasZelinka/pyfiction
   cd pyfiction
-  pip install [--user] -e .
+  pip install -e .
 
 Interface
 ---------
@@ -73,6 +78,9 @@ The following links lead to training experiments of the SSAQN agent on the suppo
 * `The Red Hair <pyfiction/examples/theredhair/lstm_online.py>`_ [HTML-based]
 * `Transit <pyfiction/examples/transit/lstm_online.py>`_ [HTML-based]
 
+Additionally, the plan is to integrate the individual games to the `OpenAI Gym <https://github.com/openai/gym>`_, see
+the `pull request <https://github.com/openai/gym/pull/671>`_ and the `text_games branch <https://github.com/MikulasZelinka/gym/tree/text_games>`_ for details.
+
 Adding new games
 ~~~~~~~~~~~~~~~~
 
@@ -94,4 +102,4 @@ References
 
 Status
 ------
-Version 0.1.0, Alpha
+Version 0.1.2, Alpha

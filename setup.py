@@ -23,7 +23,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.1.0',
+    version='0.1.2',
 
     description='pyfiction, a universal API for text-based games',
     long_description=long_description,
@@ -89,7 +89,20 @@ setup(
     # installed, specify them here.  If using Python 2.6 or less, then these
     # have to be included in MANIFEST.in as well.
     package_data={
-        'pyfiction': ['pyfiction/interpreters/zmachine/dfrotz', 'pyfiction/interpreters/glulx/cheapglulxe'],
+        'pyfiction': ['interpreters/zmachine/dfrotz', 'interpreters/glulx/cheapglulxe',
+                      'games/CatSimulator2016/index.html',
+                      'games/HowlingDogs/index.html',
+                      'games/StarCourt/index.html',
+                      'games/TheRedHair/index.html',
+                      'games/TheRedHair/index_files/*',
+                      'games/Transit/index.html',
+                      'games/Six/Six.gblorb',
+                      'simulators/text_games/simulators/savingjohn_wordId.pickle',
+                      'simulators/text_games/simulators/savingjohn.pickle',
+                      'simulators/text_games/simulators/savingjohn_actionId.pickle',
+                      'simulators/text_games/simulators/machineofdeath_wordId.pickle',
+                      'simulators/text_games/simulators/machineofdeath_actionId.pickle'
+                      ],
     },
 
     # Although 'package_data' is the preferred approach, in some case you may
