@@ -16,7 +16,7 @@ Pyfiction also includes sample agents that can learn to play the supplied text g
 Requirements
 ------------
 
-* Python 3.6 (older version might work but they aren't tested, Python 3.5 tested briefly)
+* Python 3.6 (older versions might work but they aren't tested, Python 3.5 tested briefly)
 * `text-games <https://github.com/MikulasZelinka/text-games>`_ submodule for games 'Saving John' and 'Machine of Death'
 * `keras <https://github.com/fchollet/keras>`_, `tensorflow <https://github.com/tensorflow/tensorflow>`_ and their dependencies for launching the example agents
 * selenium and `chromedriver <https://sites.google.com/a/chromium.org/chromedriver/>`_ for running the HTML-based games
@@ -85,6 +85,10 @@ Adding new games
 ~~~~~~~~~~~~~~~~
 
 TODO.
+
+Adding new HTML-based games is straightforward; refer to the already implemented games (such as Cat Simulator 2016) and to the differences between their implementations in the `games <pyfiction/games>`_ and `simulators <pyfiction/simulators/games>`_ folders for inspiration.
+
+It is only necessary to a) parse the available state and actions and b) identify and numerically annotate the endings.
 
 
 
