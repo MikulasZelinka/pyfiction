@@ -99,7 +99,7 @@ References
 
 [2] `Deep Reinforcement Learning with a Natural Language Action Space <https://arxiv.org/abs/1511.04636>`_
 
-[3] `Using reinforcement learning to learn how to play text-based games <http://www.ms.mff.cuni.cz/~zelinkm/text-games/thesis.pdf>`_ (Master thesis; draft, to be defended in 09/2017)
+[3] `Using reinforcement learning to learn how to play text-based games <http://www.ms.mff.cuni.cz/~zelinkm/text-games/thesis.pdf>`_ (Master thesis; defended in 09/2017)
 
 [4] `Reinforcement Learning: An Introduction <http://incompleteideas.net/sutton/book/the-book-2nd.html>`_
 
