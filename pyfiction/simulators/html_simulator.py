@@ -29,3 +29,6 @@ class HTMLSimulator(Simulator):
 
     def read(self):
         pass
+
+    def close(self):
+        self.driver.close()

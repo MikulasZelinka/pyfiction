@@ -135,9 +135,6 @@ class StarCourtSimulator(HTMLSimulator):
 
         return text, [action[0] for action in self.actions], reward
 
-    def close(self):
-        self.driver.close()
-
 
 if __name__ == '__main__':
     simulator = StarCourtSimulator()
@@ -173,5 +170,5 @@ if __name__ == '__main__':
 
         simulator.restart()
 
-    simulator.driver.close()
+    simulator.close()
     print('starts', starts, 'ends', ends)

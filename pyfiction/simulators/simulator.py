@@ -14,19 +14,22 @@ class Simulator:
     game = None
 
     def __init__(self):
-        raise NotImplementedError("Game is an abstract class.")
+        raise NotImplementedError("Simulator is an abstract class.")
 
     def restart(self):
-        raise NotImplementedError("Game is an abstract class.")
+        raise NotImplementedError("Simulator is an abstract class.")
 
     def startup_actions(self):
-        raise NotImplementedError("Game is an abstract class.")
+        raise NotImplementedError("Simulator is an abstract class.")
 
     def write(self, text):
-        raise NotImplementedError("Game is an abstract class.")
+        raise NotImplementedError("Simulator is an abstract class.")
 
     def read(self, timeout=0.01):
-        raise NotImplementedError("Game is an abstract class.")
+        raise NotImplementedError("Simulator is an abstract class.")
+    
+    def close(self):
+        raise NotImplementedError("Simulator is an abstract class.")
 
 
 class UnknownEndingException(Exception):

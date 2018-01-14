@@ -22,7 +22,7 @@ class MachineOfDeathSimulator(Simulator):
     # if the game rewards are in e.g. [-30, 30], set the reward scale to 30 so that the result is in [-1, 1]
     reward_scale = 30
 
-    def __startup_actions(self):
+    def startup_actions(self):
         pass
 
     def restart(self):
@@ -37,6 +37,9 @@ class MachineOfDeathSimulator(Simulator):
         # the original simulator does not remove some HTML tags - remove them all:
         state = re.sub('<[^>]*>', '', state)
         return state, actions, reward
+
+    def close(self):
+        pass
 
     def write(self, index):
         """

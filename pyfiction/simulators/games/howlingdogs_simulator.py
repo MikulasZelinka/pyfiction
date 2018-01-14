@@ -5,7 +5,6 @@ from pyfiction.simulators.html_simulator import HTMLSimulator
 
 
 class HowlingDogsSimulator(HTMLSimulator):
-
     # the maximum number of steps the agent should take before we interrupt him to break infinite cycles
     max_steps = 1000
 
@@ -64,9 +63,6 @@ class HowlingDogsSimulator(HTMLSimulator):
     def startup_actions(self):
         super(HowlingDogsSimulator, self).startup_actions()
 
-    def close(self):
-        self.driver.close()
-
 
 if __name__ == '__main__':
     simulator = HowlingDogsSimulator()
@@ -93,4 +89,4 @@ if __name__ == '__main__':
 
         simulator.restart()
 
-    simulator.driver.close()
+    simulator.close()

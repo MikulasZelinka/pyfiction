@@ -91,6 +91,7 @@ def play_game(simulator):
             print('----------------------------------------------------------------')
             break
 
+    simulator.close()
     select_game()
 
 

@@ -20,7 +20,7 @@ class SavingJohnSimulator(Simulator):
     # if the game rewards are in e.g. [-30, 30], set the reward scale to 30 so that the result is in [-1, 1]
     reward_scale = 20
 
-    def __startup_actions(self):
+    def startup_actions(self):
         pass
 
     def restart(self):
@@ -38,3 +38,6 @@ class SavingJohnSimulator(Simulator):
         Accepts an INDEX of an action, not its contents (i.e. not a string or a text description).
         """
         self.simulator.Act(index)
+
+    def close(self):
+        pass
