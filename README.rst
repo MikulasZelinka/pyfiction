@@ -91,6 +91,14 @@ Adding new HTML-based games is straightforward; refer to the already implemented
 It is only necessary to a) parse the available state and actions and b) identify and numerically annotate the endings.
 
 
+TODO
+----
+
+Better documentation for adding new games.
+
+Update SSAQN agent to tensorflow 1.5.
+
+Tests.
 
 References
 ----------
