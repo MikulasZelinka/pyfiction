@@ -118,5 +118,5 @@ setup(
         'console_scripts': [
             'pyfiction=pyfiction:main',
         ],
-    }, install_requires=['numpy', 'tensorflow==2.5.0', 'keras==2.0.4', 'h5py', 'selenium', 'pydot']
+    }, install_requires=['numpy', 'tensorflow==2.5.1', 'keras==2.0.4', 'h5py', 'selenium', 'pydot']
 )
