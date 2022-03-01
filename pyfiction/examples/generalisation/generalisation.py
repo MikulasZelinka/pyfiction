@@ -2,8 +2,8 @@ import argparse
 import logging
 import string
 
-from keras.optimizers import RMSprop
-from keras.utils import plot_model
+import tensorflow as tf
+from keras.utils.vis_utils import plot_model
 from pyfiction.agents.ssaqn_agent import SSAQNAgent
 from pyfiction.simulators.games.catsimulator2016_simulator import CatSimulator2016Simulator
 from pyfiction.simulators.games.machineofdeath_simulator import MachineOfDeathSimulator
@@ -67,7 +67,7 @@ agent = SSAQNAgent(train_simulators=train_simulators, test_simulators=test_simul
 # Load or learn the vocabulary (random sampling on this many games could be extremely slow)
 agent.initialize_tokens('vocabulary.txt')
 
-optimizer = RMSprop(lr=0.00001)
+optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.00001)
 
 embedding_dimensions = 16
 lstm_dimensions = 32
