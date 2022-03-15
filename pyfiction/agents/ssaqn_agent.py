@@ -9,7 +9,9 @@ import numpy as np
 import re
 from keras import Input
 from keras.callbacks import TensorBoard
-from keras.engine import Model
+
+from keras.models import Model
+# from keras.engine import Model
 
 from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
