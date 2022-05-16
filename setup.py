@@ -14,8 +14,9 @@ from setuptools import setup, find_packages
 here = path.abspath(path.dirname(__file__))
 
 # Get the long description from the README file
-with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
-    long_description = f.read()
+from pathlib import Path
+this_directory = Path(__file__).parent
+long_description = (this_directory / "README.rst").read_text()
 
 setup(
     name='pyfiction',
@@ -26,6 +27,7 @@ setup(
     version='0.1.3',
 
     description='pyfiction, a universal API for text-based games',
+    long_description_content_type='text/x-rst',
     long_description=long_description,
 
     # The project's main homepage.
